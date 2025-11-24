@@ -1,0 +1,8 @@
+darwin:
+  base_path: "/mac/base/path"
+  src_path: "/mac/source/path"
+  data_path: "/mac/data/path"
+linux:
+  base_path: "/linux/base/path"
+  src_path: "/linux/source/path"
+  data_path: "/linux/data/path"
