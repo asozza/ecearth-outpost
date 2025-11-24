@@ -1,0 +1,26 @@
+# Create the environment:
+# mamba env create -f environment-common.yml 
+# or if you really want to use conda
+# conda env create -f environment-common.yml
+name: ecearth-outpost
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python==3.12
+  - cdo=2.4.0
+  - ipykernel
+  - numpy
+  - scipy
+  - xarray
+  - dask
+  - matplotlib
+  - netcdf4
+  - nc-time-axis
+  - cftime
+  - gsw
+  - psutil
+  - pip
+  - pip:
+    - -e .
