@@ -1,8 +1,6 @@
-# Create the environment:
-# mamba env create -f environment-common.yml 
-# or if you really want to use conda
-# conda env create -f environment-common.yml
-name: ecearth-outpost
+# Create the conda environment:
+# conda env create -f environment.yml -n ecearth-outpost
+#name: ecearth-outpost
 
 channels:
   - conda-forge
