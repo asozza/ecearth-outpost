@@ -1,5 +1,5 @@
 # Create the conda environment:
-# conda env create -f environment.yml -n ecearth-outpost
+# conda env create -f environment.yml -n [ecearth-outpost,ecpost,...]
 #name: ecearth-outpost
 
 channels:
@@ -7,13 +7,14 @@ channels:
 
 dependencies:
   - python==3.12
-  - cdo=2.4.0
   - ipykernel
   - numpy
   - scipy
   - xarray
   - dask
+  - cdo=2.4.0
   - matplotlib
+  - seaborn
   - netcdf4
   - nc-time-axis
   - cftime

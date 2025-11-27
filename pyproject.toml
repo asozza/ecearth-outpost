@@ -20,20 +20,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12"
 ]
 dependencies = [
-    "xarray",
-    "netcdf4",
-    "numba",
-    "numpy",
-    "dask",
-    "pandas",
     "ruamel.yaml",
-    "matplotlib",
-    "cftime",
-    "nc-time-axis",
-    "cdo",
-    "scipy",
-    "gsw",
-    "psutil"
+    "cdo"
 ]
 
 [tool.setuptools.packages.find]
