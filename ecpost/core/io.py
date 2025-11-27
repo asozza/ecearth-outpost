@@ -15,8 +15,8 @@ import xarray as xr
 import cftime
 import dask
 
-from outpost.utils import config
-from outpost.utils import catalogue
+from ecpost.core import config
+from ecpost.core import catalogue
 
 # dask optimization
 #dask.config.set({'array.optimize_blockwise': True})
