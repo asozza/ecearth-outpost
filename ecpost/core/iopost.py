@@ -13,13 +13,10 @@ import logging
 import numpy as np
 import xarray as xr
 
-from cauda.utils import catalogue
-from cauda.utils import config
-from cauda.utils.time import get_leg
-from cauda.means.means import spacemean, timemean
-from cauda.means.means import apply_cost_function
-from cauda.actions.reader import reader_rebuilt, reader_nemo_field
-from cauda.actions.rebuilder import rebuilder
+from ecpost.core import config
+from ecpost.core import catalogue   
+from ecpost.core.io import reader_nemo_field
+from ecpost.core.means import spacemean, timemean, apply_cost_function
 
 # dask optimization of blocksizes
 #dask.config.set({'array.optimize_blockwise': True})
@@ -290,39 +287,9 @@ def averaging(data, varname, diagname, format, orca):
         # Create the dataset
         ds = xr.Dataset(data_vars=data_vars, attrs={'description': 'ECE4/NEMO Time-averaged field'})
 
-
     return ds
 
 
 ##########################################################################################
-
-# Reader of multiple restarts (rebuilt or not)
-def reader_restart(expname, startyear, endyear):
-    """ 
-    reader_restart: reader of NEMO restart files in a range of legs 
-    
-    Args:
-    expname: experiment name
-    startyear,endyear: time window
-
-    """
-
-    startleg = get_leg(startyear)
-    endleg = get_leg(endyear)
-
-    try:
-        data = reader_rebuilt(expname, startleg, endleg)
-        return data
-    except FileNotFoundError:
-        print(" Restart file not found. Rebuilding ... ")
-
-    # rebuild files
-    for leg in range(startleg,endleg+1):
-        rebuilder(expname, leg)
-
-    data = reader_rebuilt(expname, startleg, endleg)
-
-    return data
-
 ##########################################################################################
 
