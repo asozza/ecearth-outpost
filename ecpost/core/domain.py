@@ -13,7 +13,7 @@ import glob
 import logging
 import xarray as xr
 
-from cauda.utils import config
+from ecpost.core import config
 
 ##########################################################################################
 # Reader of NEMO domain
@@ -35,7 +35,7 @@ def read_domain(orca):
 
     return domain
 
-def elements(orca):
+def elements(orca='ORCA2'):
     """ Define differential forms for integrals """
 
     df = {}
