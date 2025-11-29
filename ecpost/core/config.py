@@ -21,10 +21,16 @@ logging.basicConfig(
 def load_config():
     """ Load configuration file """
 
-    config_path = "../../config.yml"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_dir, "..", "..", "config.yml")
+    config_path = os.path.abspath(config_path)
+
+    # config_path = "../../config.yml"
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             return yaml.safe_load(f)
+
+    logging.warning(f"Config file not found at path: {config_path}. Using empty config.")
 
     return {}
     
