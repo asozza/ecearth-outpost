@@ -286,4 +286,37 @@ def reader_rebuilt2(expname, startleg, endleg):
 
     return data
 
+def _get_leg(year, year_zero=1990):
+    """ Get leg from date """
+
+    return (year - year_zero + 1)
+
+# Reader of multiple restarts (rebuilt or not)
+def reader_restarts(expname, startyear, endyear):
+    """ 
+    reader_restart: reader of NEMO restart files in a range of legs 
+    
+    Args:
+    expname: experiment name
+    startyear,endyear: time window
+
+    """
+
+    startleg = _get_leg(startyear)
+    endleg = _get_leg(endyear)
+
+    try:
+        data = reader_rebuilt(expname, startleg, endleg)
+        return data
+    except FileNotFoundError:
+        print(" Restart file not found. Rebuilding ... ")
+
+    # rebuild files
+    for leg in range(startleg,endleg+1):
+        rebuilder(expname, leg)
+
+    data = reader_rebuilt(expname, startleg, endleg)
+
+    return data
+
 ##########################################################################################
