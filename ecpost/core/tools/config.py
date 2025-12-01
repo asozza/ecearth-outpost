@@ -18,14 +18,29 @@ logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s')
 
+
+def get_project_root(cwd=None, project_name="ecearth-outpost"):
+    """ Get base folder of the github project """
+
+    if cwd is None:
+        cwd = os.getcwd()
+
+    parts = cwd.split(os.sep)
+
+    if project_name in parts:
+        idx = parts.index(project_name)
+        root = os.sep.join(parts[:idx+1])
+        return root
+
+    raise RuntimeError(f"Folder '{project_name}' not found in path: {cwd}")
+
+
 def load_config():
     """ Load configuration file """
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(base_dir, "..", "..", "config.yml")
-    config_path = os.path.abspath(config_path)
+    project_root = get_project_root()
+    config_path = os.path.join(project_root, "config.yml")
 
-    # config_path = "../../config.yml"
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             return yaml.safe_load(f)
@@ -34,6 +49,7 @@ def load_config():
 
     return {}
     
+
 def folders(expname):
     """ List of global paths dependent on expname """
     

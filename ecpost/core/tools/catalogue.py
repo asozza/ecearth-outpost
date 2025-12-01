@@ -11,7 +11,7 @@ Date: Nov 2025
 
 import gsw  # Gibbs SeaWater library for oceanographic calculations
 
-from ecpost.core.regrid import regrid_U_to_T, regrid_V_to_T, regrid_W_to_T 
+from ecpost.core.means.regrid import regrid_U_to_T, regrid_V_to_T, regrid_W_to_T 
 
 def _density(thetao, so):
     """ Potential density """

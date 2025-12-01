@@ -14,10 +14,11 @@ import xarray as xr
 import cftime
 import dask
 import logging
+
 from scipy.interpolate import interp1d
 from scipy.stats import entropy
 
-from ecpost.core.domain import elements
+from ecpost.core.io.domain import elements
 
 #dask.config.set({'array.optimize_blockwise': True})
 

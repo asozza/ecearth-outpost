@@ -8,20 +8,12 @@ Author: Alessandro Sozza (CNR-ISAC)
 Date: Mar 2024
 """
 
+import os
 import numpy as np
 import xarray as xr
 
-from ecpost.core import config
-
-def _get_domain(orca):
-    """ Read NEMO domain configuration file """
-
-    dirs = config.folders('')
-    filename = os.path.join(dirs['domain'], orca, 'domain_cfg.nc')
-    domain = xr.open_mfdataset(filename, preprocess=preproc_nemo_domain)
-    domain = domain.isel(time=0)
-
-    return domain
+from ecpost.core.tools import config
+from ecpost.core.io.domain import read_domain
 
 #################################################################################
 #

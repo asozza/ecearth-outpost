@@ -13,7 +13,7 @@ import glob
 import logging
 import xarray as xr
 
-from ecpost.core import config
+from ecpost.core.tools import config
 
 ##########################################################################################
 # Reader of NEMO domain

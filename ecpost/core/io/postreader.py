@@ -9,14 +9,15 @@ Date: Nov 2025
 """
 
 import os
+import shutil
 import logging
 import numpy as np
 import xarray as xr
 
-from ecpost.core import config
-from ecpost.core import catalogue   
-from ecpost.core.io import reader_nemo_field
-from ecpost.core.means import spacemean, timemean
+from ecpost.core.tools import config
+from ecpost.core.tools import catalogue   
+from ecpost.core.io.reader import reader_nemo_field
+from ecpost.core.means.means import spacemean, timemean
 
 # dask optimization of blocksizes
 #dask.config.set({'array.optimize_blockwise': True})
@@ -100,12 +101,13 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format='g
 
     logging.info(f"Merging {len(filelist)} averaged annual files...")
 
-    # Usiamo Dask perché il merge può essere pesante
+    # Using dask -- merging might be heavy
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
     ds = xr.open_mfdataset(filelist, combine='by_coords', parallel=True, decode_times=time_coder)
     writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
 
     return ds
+
 
 ##########################################################################################
 # averaging functions
@@ -180,7 +182,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     dirs = config.folders(expname)
     info = catalogue.observables('nemo')[varname]
 
-    ## try to read averaged data
+    # try to read averaged data
     try:
         if not replace:
             data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
@@ -195,7 +197,10 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         else:
             logging.info('Averaged data not found. Creating new file ...')
 
-    ## otherwise read original data and perform averaging
+    # search for existing averaged data -- both single-year and merged data 
+    
+
+    # otherwise read original data and perform averaging
     for year in range(startyear, endyear + 1):
         logging.info(f"Processing year {year}")    
         ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
@@ -209,6 +214,12 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
 
     logging.info(f"Merging averaged single-year files ...") 
     data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
+
+    if cleanup:
+        logging.info(f"Clean up averaged single-year files ...") 
+        for year in range(startyear, endyear + 1):
+            filepath = os.path.join(dirs['post'], f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+            shutil.rm(filepath)
 
     return data
 
