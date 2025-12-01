@@ -1,8 +1,8 @@
 *.DS_Store
 *.pyc
-ecearth-outpost/*/__pycache__
-ecearth-outpost/__pycache__
+ecpost/__pycache__
+ecpost/*/__pycache__
 *.egg-info/
-ecearth-outpost/figs
-ecearth-outpost/nam_*
+figs
+*/nam_*
 config.yml
