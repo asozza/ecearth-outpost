@@ -16,7 +16,6 @@ import dask
 import logging
 
 from scipy.interpolate import interp1d
-from scipy.stats import entropy
 
 from ecpost.core.io.domain import elements
 
