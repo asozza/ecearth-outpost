@@ -96,14 +96,16 @@ def timemean(data, format='global', use_cftime=True):
     Returns:
     DataArray: Time-averaged field based on the specified format.
     """
-    
+
+    # Plain (leave time as is)    
     if format == 'plain':
         ave = data
 
+    # Global time average
     elif format == 'global':
-        # Global time average over all time points
         ave = data.mean(dim='time')
-        
+
+    # Rolling average (12 months window centered)
     elif format == 'rolling':
         ave = data.rolling(time=12, center=True).mean()
 
@@ -112,24 +114,22 @@ def timemean(data, format='global', use_cftime=True):
         # Average by month across years
         ave = data.groupby('time.month').mean(dim='time')
         
-        if use_cftime:
-            
+        if use_cftime:            
             # create cftime array of dates
             last_year = data['time.year'].values[-1]
             dates = [cftime.DatetimeGregorian(last_year, month, 15, 12, 0, 0, has_year_zero=False) for month in range(1, 13)]
             
-            # create new coordinates ( space unchanged)
+            # create new time coordinate (space unchanged)
             coords = {"time": dates}
             for dim in data.coords:
                 if dim not in coords:
                     coords[dim] = data[dim]
             
+            # replace name: 'month' with 'time'
+            new_dims = ["time"] + [dim for dim in ave.dims if dim != "month"]
+
             # combine all in a new array
-            ave = xr.DataArray(
-                data=ave, 
-                dims=["time"] + [dim for dim in ave.dims if dim != "month"], # replace 'month' with 'time' 
-                coords=coords
-            )
+            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
 
 
     elif format == 'seasonally':
@@ -156,11 +156,11 @@ def timemean(data, format='global', use_cftime=True):
                         values.append(ave.sel(season=season))
                         break
 
+            # replace name: 'season' with 'time'
+            new_dims = ["time"] + [dim for dim in ave.dims if dim != "season"]
+
             # put all in a new array
-            ave = xr.DataArray(
-                data=values, 
-                dims=["time"] + [dim for dim in ave.dims if dim != "season"], # replace 'season' with 'time' 
-                coords=coords)
+            ave = xr.DataArray(data=values, dims=new_dims, coords=coords)
 
 
     elif format == 'yearly':
@@ -176,12 +176,11 @@ def timemean(data, format='global', use_cftime=True):
                 if dim not in coords:
                     coords[dim] = data[dim]
             
+            # replace name: 'year' with 'time'
+            new_dims = ["time"] + [dim for dim in ave.dims if dim != "year"]
+
             # combine all in a new array
-            ave = xr.DataArray(
-                data=ave, 
-                dims=["time"] + [dim for dim in ave.dims if dim != "year"], # replace 'year' with 'time' 
-                coords=coords
-            )
+            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
 
 
     elif format == 'seasons' or format in season_months:
