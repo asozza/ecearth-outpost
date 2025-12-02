@@ -21,6 +21,8 @@ def _density(thetao, so):
 
     return rho
 
+# brunt-vaisala ???
+
 def observables(component):
     """ Dictionary of EC-Earth variables """
 

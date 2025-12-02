@@ -14,7 +14,7 @@ import numpy as np
 import datetime
 import time
 
-from ecpost.core.tools import config
+from ecpost.core.utils import config
 
 def get_epoch(date):
     """ Get epoch from date """
