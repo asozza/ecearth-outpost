@@ -12,10 +12,11 @@ import os
 import numpy as np
 import xarray as xr
 
-from ecpost.core.tools import config
+from ecpost.core.utils import config
 from ecpost.core.io.domain import read_domain
 
 #################################################################################
+# Da migliorare?
 #
 #    W   V --- F 
 #     \  |     |
