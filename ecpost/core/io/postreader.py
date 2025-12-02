@@ -14,8 +14,8 @@ import logging
 import numpy as np
 import xarray as xr
 
-from ecpost.core.tools import config
-from ecpost.core.tools import catalogue   
+from ecpost.core.utils import config
+from ecpost.core.utils import catalogue   
 from ecpost.core.io.reader import reader_nemo_field
 from ecpost.core.means.means import spacemean, timemean
 
