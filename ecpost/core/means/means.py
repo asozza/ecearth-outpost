@@ -10,16 +10,13 @@ Date: Mar 2024
 
 from typing import Any
 import numpy as np
+import logging
 import xarray as xr
 import cftime
-import dask
-import logging
 
 from scipy.interpolate import interp1d
 
 from ecpost.core.io.domain import elements
-
-#dask.config.set({'array.optimize_blockwise': True})
 
 # dictionary of months by seasons
 season_months = {

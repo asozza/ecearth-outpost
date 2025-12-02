@@ -15,13 +15,10 @@ import subprocess
 import logging
 import xarray as xr
 import cftime
-import dask
 
 from ecpost.core.utils import config
 from ecpost.core.utils import catalogue
 
-# dask optimization
-#dask.config.set({'array.optimize_blockwise': True})
 
 ##########################################################################################
 # Detector of axis candidates

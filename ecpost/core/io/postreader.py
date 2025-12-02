@@ -19,8 +19,6 @@ from ecpost.core.utils import catalogue
 from ecpost.core.io.reader import reader_nemo_field
 from ecpost.core.means.means import spacemean, timemean
 
-# dask optimization of blocksizes
-#dask.config.set({'array.optimize_blockwise': True})
 
 # dictionary of months by seasons
 season_months = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}
@@ -76,7 +74,7 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
     return None
 
 
-def merge_annual_files(expname, startyear, endyear, varname, diagname, format='global'):
+def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     """
     Merge annual files
 
@@ -101,9 +99,9 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format='g
 
     logging.info(f"Merging {len(filelist)} averaged annual files...")
 
-    # Using dask -- merging might be heavy
+    # Merging annual files
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds = xr.open_mfdataset(filelist, combine='by_coords', parallel=True, decode_times=time_coder)
+    ds = xr.open_mfdataset(filelist, combine='by_coords', decode_times=time_coder)
     writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
 
     return ds
