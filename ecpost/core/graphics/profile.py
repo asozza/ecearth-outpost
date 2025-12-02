@@ -16,32 +16,30 @@ import cftime
 #import nc_time_axis
 import matplotlib.pyplot as plt
 
-from cauda.utils import config
-from cauda.utils import catalogue
-
-from cauda.actions.reader import reader_nemo
-from cauda.actions.postreader import postreader_nemo
-from cauda.means.means import spacemean, timemean, cost
+from ecpost.core.utils import config
+from ecpost.core.utils import catalogue
+from ecpost.core.io.reader import reader_nemo
+from ecpost.core.io.postreader import postreader_nemo
+from ecpost.core.means.means import spacemean, timemean
 
 
 def _rescaled(vec):
     """ rescale by the initial value """
     return vec/vec[0]
 
-def profile(expname, startyear, endyear, varlabel, 
-            format="global", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
-            rescale=False, color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
+def profile(expname, startyear, endyear, varname, 
+            reader="post", orca="ORCA2", replace=False,
+            color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
     Graphics of averaged vertical profile 
     
     Positional Args:
     - expname: experiment name
     - startyear,endyear: time window
-    - varlabel: variable label (varname + ztag)
+    - varname: variable name
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
-    - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
@@ -51,26 +49,18 @@ def profile(expname, startyear, endyear, varlabel,
 
     """
 
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname=varlabel
-        ztag=None
-
     info = catalogue.observables('nemo')[varname]
 
     # Read data from raw NEMO output
     if reader == 'nemo':
-
         data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear)
         vec = timemean(data=data, format='global')
-        vec = spacemean(data=vec, ndim='2D', ztag=ztag, orca='ORCA2')
+        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
 
     # Read data from post-processed data
     elif reader == 'post':
-
-        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varlabel, 
-                               diagname='profile', format='global', orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
+                               diagname='profile', format='global', orca=orca, replace=replace)
         vec=data[varname].values.flatten()
 
     # fixing depth y-axis
