@@ -195,20 +195,29 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         else:
             logging.info('Averaged data not found. Creating new file ...')
 
-    # search for existing averaged data -- both single-year and merged data 
-    
-
     # otherwise read original data and perform averaging
+    single_year_files = []
+    missing_years = []
     for year in range(startyear, endyear + 1):
-        logging.info(f"Processing year {year}")    
-        ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
-        data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
-        writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
-        try:
-            ds.close()
-        except:
-            pass
-        del ds
+
+        # first, search for existing single-year averaged files     
+        f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+        if os.path.exists(f) and not replace:
+            single_year_files.append(f)
+        else:
+            missing_years.append(year)
+
+        # perform averaging only on missing single-year averaged files
+        if missing_years:
+            logging.info(f"Processing year {year}")    
+            ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
+            data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
+            writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
+            try:
+                ds.close()
+            except:
+                pass
+            del ds
 
     logging.info(f"Merging averaged single-year files ...") 
     data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
