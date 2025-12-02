@@ -13,14 +13,14 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from cauda.utils import config
-from cauda.utils import catalogue
-from cauda.utils.time import get_decimal_year
+from ecpost.core.utils import config
+from ecpost.core.utils import catalogue
+from ecpost.core.utils.time import get_decimal_year
 
-from cauda.means.means import apply_cost_function, movave
-from cauda.means.means import spacemean, year_shift
-from cauda.actions.reader import reader_nemo, reader_nemo_field
-from cauda.actions.postreader import postreader_nemo, averaging
+from ecpost.core.means.means import apply_cost_function, movave
+from ecpost.core.means.means import spacemean, year_shift
+from ecpost.core.io.reader import reader_nemo, reader_nemo_field
+from ecpost.core.io.postreader import postreader_nemo, averaging
 
 
 def _cutted(vec):
@@ -32,9 +32,9 @@ def _rescaled(vec):
     return vec/vec[0]
 
 
-def timeseries(expname, startyear, endyear, varlabel, format="plain", 
-               reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
-               rescale=False, avetype="standard", timeoff=0, 
+def timeseries(expname, startyear, endyear, varname, format="plain", 
+               reader="post", orca="ORCA2", replace=False,
+               rescale=False, avetype="standard", timeoff=-1990, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
     Graphics of timeseries 
@@ -42,11 +42,10 @@ def timeseries(expname, startyear, endyear, varlabel, format="plain",
     Positional Args:
     - expname: experiment name
     - startyear,endyear: time window
-    - varlabel: variable label (varname + ztag)
+    - varname: variable name
 
-    Optional Args:
+    Optional Args for the reader:
     - reader: read the original raw data or averaged data ['nemo', 'post']
-    - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
@@ -58,49 +57,30 @@ def timeseries(expname, startyear, endyear, varlabel, format="plain",
     - figname: save plot to file
 
     """
-    
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname, ztag = varlabel, None
 
     info = catalogue.observables('nemo')[varname]
 
     # Read data from raw NEMO output
     if reader == "nemo":
-
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
+        data = averaging(data=data, varname=varname, diagname='timeseries', format=format, orca=orca)
         tvec = get_decimal_year(data['time'].values)
-
-        # apply cost function
-        if metric != 'base':
-
-            xdata = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
-            xdata = averaging(data=xdata, varlabel=varlabel, diagname=refinfo['diagname'], format=refinfo['format'], orca=orca)            
-
-            if refinfo['diagname'] == 'field':
-                data = apply_cost_function(data, xdata, metric, format=format, format_ref=refinfo['format'])    
-                data = averaging(data=data, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
-            else:
-                data = apply_cost_function(data, xdata, metric, format=format, format_ref=refinfo['format'])
 
     # Read post-processed data
     elif reader == "post":
-
-        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varlabel, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
+                               diagname='timeseries', format=format, orca=orca, replace=replace)
         tvec = get_decimal_year(data['time'].values)
 
     # apply moving average
     if (avetype == 'moving' and format == 'plain'):
-        vec = movave(data[varlabel],12)
+        vec = movave(data[varname],12)
         tvec, vec = _cutted(tvec), _cutted(vec)
     else:
-        vec = data[varlabel].values.flatten()
+        vec = data[varname].values.flatten()
 
     # add time offset
-    if timeoff > 0:
+    if timeoff != 0:
         tvec = [time + timeoff for time in tvec]
 
     # apply rescaling
@@ -136,8 +116,8 @@ def timeseries(expname, startyear, endyear, varlabel, format="plain",
     return pp
 
 
-def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varlabel, shift_threshold, 
-                         format='plain', reader="post", orca="ORCA2", replace=False, avetype="standard", timeoff=0, 
+def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
+                         format='plain', reader="post", orca="ORCA2", replace=False, avetype="standard", timeoff=-1990, 
                          color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
     Graphics of year-shift timeseries 
@@ -145,7 +125,7 @@ def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, e
     Positional Args:
     - expname1,2: experiment names
     - startyear,endyear: time window
-    - varlabel: variable label (varname + ztag)
+    - varname: variable label (varname + ztag)
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
@@ -159,11 +139,6 @@ def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, e
     - figname: save plot to file
 
     """
-    
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname, ztag = varlabel, None
 
     info = catalogue.observables('nemo')[varname]
 
@@ -171,39 +146,39 @@ def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, e
     if reader == "nemo":
 
         data1 = reader_nemo_field(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname)        
-        data1 = averaging(data=data1, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
+        data1 = averaging(data=data1, varname=varname, diagname='timeseries', format=format, orca=orca)
         tvec1 = get_decimal_year(data1['time'].values)
 
         data2 = reader_nemo_field(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname)        
-        data2 = averaging(data=data2, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
+        data2 = averaging(data=data2, varname=varname, diagname='timeseries', format=format, orca=orca)
         tvec2 = get_decimal_year(data2['time'].values)
 
     # Read post-processed data
     elif reader == "post":
 
-        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varlabel=varlabel, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace, metric='base', refinfo=None)
+        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, 
+                               diagname='timeseries', format=format, orca=orca, replace=replace)
         tvec1 = get_decimal_year(data1['time'].values)
 
-        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varlabel=varlabel, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace, metric='base', refinfo=None)
+        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, 
+                               diagname='timeseries', format=format, orca=orca, replace=replace)
         tvec2 = get_decimal_year(data2['time'].values)
 
         # apply moving average
         if avetype == 'moving':
-            vec1 = movave(data1[varlabel],12)
+            vec1 = movave(data1[varname],12)
             tvec1, vec1 = _cutted(tvec1), _cutted(vec1)
-            vec2 = movave(data2[varlabel],12)
+            vec2 = movave(data2[varname],12)
             tvec2, vec2 = _cutted(tvec2), _cutted(vec2)
         else:
-            vec1 = data1[varlabel].values
-            vec2 = data2[varlabel].values
+            vec1 = data1[varname].values
+            vec2 = data2[varname].values
 
     # compute year-shift
     shift = year_shift(tvec1, vec1, tvec2, vec2, shift_threshold)
 
     # add time offset
-    if timeoff > 0:
+    if timeoff != 0:
         tvec1 = [time + timeoff for time in tvec1]
         tvec2 = [time + timeoff for time in tvec2]
 
@@ -240,7 +215,7 @@ def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, e
     return pp
 
 
-def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varlabel, shift_threshold, 
+def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
                               reader="nemo", replace=False, avetype="standard", timeoff=0, residue=False,
                               color=None, marker=None, label=None, ax=None, figname=None):
     """ 
@@ -249,7 +224,7 @@ def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyea
     Positional Args:
     - expname1,2: experiment names
     - startyear,endyear: time window
-    - varlabel: variable label (varname + ztag)
+    - varname: variable label (varname + ztag)
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
@@ -263,11 +238,6 @@ def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyea
     - figname: save plot to file
 
     """
-    
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname, ztag = varlabel, None
 
     info = catalogue.observables('nemo')[varname]
 
@@ -281,37 +251,37 @@ def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyea
 
         # apply moving average (if needed)
         if avetype == 'moving':
-            vec1 = movave(spacemean(data1, varname, info['dim'], ztag),12)
+            vec1 = movave(spacemean(data1, varname, info['dim'], orca),12)
             tvec1, vec1 = _cutted(tvec1), _cutted(vec1)
-            vec2 = movave(spacemean(data2, varname, info['dim'], ztag),12)
+            vec2 = movave(spacemean(data2, varname, info['dim'], orca),12)
             tvec2, vec2 = _cutted(tvec2), _cutted(vec2)
         else:
-            vec1 = spacemean(data1, varname, info['dim'], ztag)
-            vec2 = spacemean(data2, varname, info['dim'], ztag)
+            vec1 = spacemean(data1, varname, info['dim'], orca)
+            vec2 = spacemean(data2, varname, info['dim'], orca)
 
     # Read post-processed data
     elif reader == "post":
-        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varlabel=varlabel, diagname='timeseries', replace=replace, metric='base')
-        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varlabel=varlabel, diagname='timeseries', replace=replace, metric='base')
+        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, diagname='timeseries', replace=replace, metric='base')
+        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, diagname='timeseries', replace=replace, metric='base')
 
         tvec1 = data1['time'].values.flatten()
         tvec2 = data2['time'].values.flatten()
 
         # apply moving average
         if avetype == 'moving':
-            vec1 = movave(data1[varlabel],12)
+            vec1 = movave(data1[varname],12)
             tvec1, vec1 = _cutted(tvec1), _cutted(vec1)
-            vec2 = movave(data2[varlabel],12)
+            vec2 = movave(data2[varname],12)
             tvec2, vec2 = _cutted(tvec2), _cutted(vec2)
         else:
-            vec1 = data1[varlabel].values.flatten()
-            vec2 = data2[varlabel].values.flatten()
+            vec1 = data1[varname].values.flatten()
+            vec2 = data2[varname].values.flatten()
 
     # compute year-shift
     shift = year_shift(tvec1, vec1, tvec2, vec2, shift_threshold)
 
     # add time offset
-    if timeoff > 0:
+    if timeoff != 0:
         tvec1 = [time + timeoff for time in tvec1]
         tvec2 = [time + timeoff for time in tvec2]
 
@@ -359,7 +329,7 @@ def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyea
     return pp
 
 
-def timeseries_with_markers(expname, startyear, endyear, varlabel, format="plain", 
+def timeseries_with_markers(expname, startyear, endyear, varname, format="plain", 
                reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
                rescale=False, avetype="standard", timeoff=0, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
@@ -369,7 +339,7 @@ def timeseries_with_markers(expname, startyear, endyear, varlabel, format="plain
     Positional Args:
     - expname: experiment name
     - startyear,endyear: time window
-    - varlabel: variable label (varname + ztag)
+    - varname: variable label (varname + ztag)
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
@@ -385,11 +355,6 @@ def timeseries_with_markers(expname, startyear, endyear, varlabel, format="plain
     - figname: save plot to file
 
     """
-    
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname, ztag = varlabel, None
 
     info = catalogue.observables('nemo')[varname]
 
@@ -397,22 +362,22 @@ def timeseries_with_markers(expname, startyear, endyear, varlabel, format="plain
     if reader == "nemo":
 
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
+        data = averaging(data=data, varname=varname, diagname='timeseries', format=format, orca=orca)
         tvec = get_decimal_year(data['time'].values)
 
     # Read post-processed data
     elif reader == "post":
 
         data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, 
-                               varlabel=varlabel, diagname='timeseries', replace=replace, metric=metric)
+                               varname=varname, diagname='timeseries', replace=replace, metric=metric)
         tvec = data['time'].values
 
     # apply moving average
     if avetype == 'moving':
-        vec = movave(data[varlabel],12)
+        vec = movave(data[varname],12)
         tvec, vec = _cutted(tvec), _cutted(vec)
     else:
-        vec = data[varlabel].values.flatten()
+        vec = data[varname].values.flatten()
 
     # add time offset
     if timeoff > 0:
