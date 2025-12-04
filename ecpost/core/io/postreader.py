@@ -74,175 +74,246 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
     return None
 
 
-def merge_annual_files_old(expname, startyear, endyear, varname, diagname, format):
-    """
-    Merge annual files
+##########################################################################################
+# merging functions
 
-    Args:
-        expname: experiment name
-        startyear,endyear: time window
-        varname: variable name
-        diagname: diagnostics name [series, prof, hovm, map, fld, pdf]
-        format: time format [plain, global, monthly, seasonally, yearly]
+def find_existing_merged(varname, expname, diagname, format):
     """
-
+    Scan the post directory for merged files of a given variable,
+    classify them into:
+      - longest : the merged file with the largest time span
+      - contained : fully contained in another merged file
+      - partial : partially overlapping with the longest
+      - disjoint : no overlap with the longest
+    """
     dirs = config.folders(expname)
-    filelist = []
+    postdir = dirs['post']
 
-    for year in range(startyear, endyear + 1):
-        f = os.path.join(dirs['post'], f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
-        if os.path.exists(f):
-            filelist.append(f)
-
-    if not filelist:
-        raise FileNotFoundError("No annual averaged files found.")
-    logging.info(f"Merging {len(filelist)} annual averaged files...")
-
-    # Merging annual files
-    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds = xr.open_mfdataset(filelist, combine='by_coords', decode_times=time_coder)
-    writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
-
-    return ds
-
-
-def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
-    """
-    Merge annual files into a single dataset, reusing merged files when possible.
-
-    Args:
-        expname: experiment name
-        startyear, endyear: time window
-        varname: variable name
-        diagname: diagnostics name
-        format: time format
-    """
-
-    dirs = config.folders(expname)
-    all_files = os.listdir(dirs['post'])
-
-    pattern = rf"{varname}_{expname}_(\d+)-(\d+)_{diagname}_{format}\.nc"
-    files_info = []
-
-    for f in all_files:
-        m = re.match(pattern, f)
-        if m:
-            y1, y2 = int(m.group(1)), int(m.group(2))
-            files_info.append((y1, y2, os.path.join(dirs['post'], f)))
-
-    merged_files = [(y1, y2, f) for y1, y2, f in files_info if y1 != y2]
-    annual_files = [(y1, f) for y1, y2, f in files_info if y1 == y2]
-
-    # Search for covered years by merged files
-    covered_years = set()
-    for y1, y2, _ in merged_files:
-        covered_years.update(range(y1, y2+1))
-
-    requested_years = set(range(startyear, endyear+1))
-    missing_years = requested_years - covered_years
-
-    # prepare list of files to merge
-    files_to_merge = []
-    for y1, y2, f in merged_files:
-        if set(range(y1, y2+1)) & requested_years:
-            files_to_merge.append(f)
-    for y, f in annual_files:
-        if y in missing_years:
-            files_to_merge.append(f)
-
-    if not files_to_merge:
-        raise FileNotFoundError("No files found for the requested interval.")
-
-    logging.info(f"Merging {len(files_to_merge)} files covering years {startyear}-{endyear}")
-    logging.info(f"Missing years merged from annual files: {sorted(missing_years)}")
-
-    # Open dataset, concatenate and write merged file
-    time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    ds = xr.open_mfdataset(files_to_merge, combine='by_coords', decode_times=time_coder)
-    writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
-
-    logging.info(f"Merged file for {startyear}-{endyear} written successfully.")
-
-    return ds
-
-
-def cleaning(expname, startyear, endyear, varname, diagname, format, dry_run=True):
-    """
-    Smart cleaning of merged files and single annual files.
-    Identify and classify longest file and other files like:
-        - redundant files 
-        - partially overlapped files
-        - disjoined files
-    If dry_run=False clean up files automatically.
-    """
-
-    dirs = config.folders(expname)
-    all_files = os.listdir(dirs['post'])
-
-    pattern = rf"{varname}_{expname}_(\d+)-(\d+)_{diagname}_{format}\.nc"
+    pattern = re.compile(rf"{re.escape(varname)}_{re.escape(expname)}_(\d+)-(\d+)_{diagname}_{format}\.nc")
 
     merged = []
-
-    # Find already merged files
-    for fname in all_files:
-        m = re.match(pattern, fname)
-        if m:
-            y1, y2 = int(m.group(1)), int(m.group(2))
-            if y1 != y2:
-                full_path = os.path.join(dirs['post'], fname)
-                span = y2 - y1 + 1
-                merged.append((y1, y2, span, fname, full_path))
+    for fname in os.listdir(postdir):
+        m = pattern.match(fname)
+        if not m:
+            continue
+        start, end = map(int, m.groups())
+        if start == end:
+            continue  # skip single-year files
+        merged.append({
+            "file": os.path.join(postdir, fname),
+            "start": start,
+            "end": end,
+            "span": end - start + 1
+        })
 
     if not merged:
         logging.info("No merged files found.")
-        return None
+        return None, [], [], []
 
-    # Order by length, then by starting year
-    merged.sort(key=lambda x: (-x[2], x[0]))
-    longest = merged[0]
-    long_y1, long_y2, long_span, long_name, long_path = longest
-
-    logging.info(f"Longest merged file: {long_name} {long_y1}-{long_y2}, {long_span} years)")
+    # Find the longest merged file
+    longest = max(merged, key=lambda x: x["span"])
 
     contained = []
     partial = []
     disjoint = []
 
-    for y1, y2, span, fname, fpath in merged[1:]:
+    LY1, LY2 = longest["start"], longest["end"]
 
-        if y1 >= long_y1 and y2 <= long_y2:
-            # fully covered 
-            contained.append((fname, y1, y2))
-
-        elif y2 < long_y1 or y1 > long_y2:
-            # no overlap
-            disjoint.append((fname, y1, y2))
-
+    for m in merged:
+        if m is longest:
+            continue
+        y1, y2 = m["start"], m["end"]
+        if y1 >= LY1 and y2 <= LY2:
+            contained.append(m)
+        elif y2 < LY1 or y1 > LY2:
+            disjoint.append(m)
         else:
-            # partial overlap
-            partial.append((fname, y1, y2))
+            partial.append(m)
 
-    logging.info(f"Fully contained merged files (safe to delete): {contained}")
-    logging.info(f"Partially overlapping merged files: {partial}")
-    logging.info(f"Disjoint merged files: {disjoint}")
+    logging.info({
+        "longest": longest,
+        "contained": contained,
+        "partial": partial,
+        "disjoint": disjoint
+    })
 
-    # Clean, if asked
-    if not dry_run:
-        for fname, y1, y2 in contained:
-            path = os.path.join(dirs['post'], fname)
+    return longest, contained, partial, disjoint
+
+
+def select_usable_blocks(longest, contained, partial, disjoint):
+    """
+    Return a list of usable merged blocks, keeping:
+      - the longest merged
+      - disjoint files
+    Automatically remove any block completely contained in another.
+    """
+    if not longest:
+        return []
+
+    blocks = [longest] + disjoint
+
+    # Remove blocks fully contained in others
+    filtered = []
+    for b in blocks:
+        keep = True
+        for other in blocks:
+            if other is b:
+                continue
+            if b["start"] >= other["start"] and b["end"] <= other["end"]:
+                keep = False
+                break
+        if keep:
+            filtered.append(b)
+
+    filtered.sort(key=lambda x: x["start"])
+
+    logging.info("Usable merged blocks:")
+    for b in filtered:
+        logging.info(f"  - {b['file']} [{b['start']}-{b['end']}]")
+
+    return filtered
+
+
+def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
+    """
+    Merge single-year files and usable merged blocks into a single dataset.
+    Ensures no overlapping time coordinates and chronological order.
+    """
+    dirs = config.folders(expname)
+    postdir = dirs['post']
+
+    # Pattern for single-year files
+    single_pattern = f"{varname}_{expname}_{{year}}-{{year}}_{diagname}_{format}.nc"
+
+    # 1) Find existing merged files
+    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+    usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)
+
+    # 2) Determine which years are covered by merged blocks
+    covered_years = set()
+    for b in usable_blocks:
+        covered_years.update(range(b["start"], b["end"] + 1))
+
+    requested_years = set(range(startyear, endyear + 1))
+    missing_years = sorted(requested_years - covered_years)
+
+    logging.info(f"Requested years: {startyear}-{endyear}")
+    logging.info(f"Years covered by merged blocks: {sorted(covered_years)}")
+    logging.info(f"Missing single years: {missing_years}")
+
+    # 3) Prepare list of files to merge
+    files_to_merge = [b["file"] for b in usable_blocks]
+
+    for y in missing_years:
+        fpath = os.path.join(postdir, single_pattern.format(year=y))
+        if not os.path.exists(fpath):
+            raise FileNotFoundError(f"Missing single-year file: {fpath}")
+        files_to_merge.append(fpath)
+
+    if not files_to_merge:
+        raise RuntimeError("No files found to merge!")
+
+    files_to_merge.sort()
+    logging.info("Final list of files to merge:")
+    for f in files_to_merge:
+        logging.info(f"  - {f}")
+
+    # 4) Open datasets and concatenate manually
+    datasets = []
+    for f in files_to_merge:
+        logging.info(f"Opening: {os.path.basename(f)}")
+        ds = xr.open_dataset(f, decode_times=True)
+        datasets.append(ds)
+
+    logging.info("Concatenating datasets...")
+    ds_out = xr.concat(datasets, dim="time")
+    ds_out = ds_out.sortby("time")
+
+    # 5) Write merged output
+    fout = os.path.join(postdir, f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}.nc")
+    logging.info(f"Writing merged dataset to: {fout}")
+    ds_out.to_netcdf(fout)
+    logging.info("Merge complete.")
+
+    return ds_out
+
+
+def clean_merged_files(expname, varname, diagname, format, dry_run=True):
+    """
+    Clean up redundant merged files:
+      - keeps the longest merged
+      - identifies fully contained merged files for deletion
+      - optionally deletes them if dry_run=False
+    """
+    dirs = config.folders(expname)
+    postdir = dirs['post']
+
+    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+
+    if not longest:
+        logging.info("No merged files found to clean.")
+        return
+
+    logging.info(f"Longest merged file: {longest['file']} [{longest['start']}-{longest['end']}]")
+    logging.info(f"Fully contained files (candidate for deletion): {[c['file'] for c in contained]}")
+    logging.info(f"Partially overlapping files: {[p['file'] for p in partial]}")
+    logging.info(f"Disjoint files: {[d['file'] for d in disjoint]}")
+
+    if contained and not dry_run:
+        for c in contained:
             try:
-                os.remove(path)
-                logging.info(f"Deleted redundant merged file: {fname}")
+                os.remove(c['file'])
+                logging.info(f"Deleted redundant merged file: {c['file']}")
             except Exception as e:
-                logging.error(f"Failed to delete {fname}: {e}")
-        logging.info("Cleanup completed.")
+                logging.error(f"Failed to delete {c['file']}: {e}")
 
-        # clean single annual files
-        for year in range(startyear, endyear + 1):
-            filepath = os.path.join(dirs['post'], f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
-            os.remove(filepath)
+    if dry_run:
+        logging.info("Dry run enabled. No files were deleted.")
 
-    return {"longest": longest,"contained": contained,"partial": partial,"disjoint": disjoint}
+    summary = {
+        "longest": longest,
+        "contained": contained,
+        "partial": partial,
+        "disjoint": disjoint
+    }
+
+    logging.info(f"Merged file cleanup summary:\n{summary}")
+    return summary
+
+
+def clean_annual_files(expname, startyear, endyear, varname, diagname, format, dry_run=True):
+    """
+    Delete single-year files for a given variable and experiment.
+
+    Args:
+        expname (str): Experiment name.
+        startyear (int): Start year of the interval.
+        endyear (int): End year of the interval.
+        varname (str): Variable name.
+        diagname (str): Diagnostics name.
+        format (str): Time format.
+        dry_run (bool): If True, only log files without deleting.
+    """
+    dirs = config.folders(expname)
+    postdir = dirs['post']
+
+    logging.info(f"{'Dry run: would delete' if dry_run else 'Deleting'} single-year files for {varname} {startyear}-{endyear}:")
+
+    for year in range(startyear, endyear + 1):
+        filepath = os.path.join(postdir, f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+        if os.path.exists(filepath):
+            if dry_run:
+                logging.info(f"  - {filepath}")
+            else:
+                try:
+                    os.remove(filepath)
+                    logging.info(f"Deleted: {filepath}")
+                except Exception as e:
+                    logging.error(f"Failed to delete {filepath}: {e}")
+        else:
+            logging.warning(f"File not found, skipping: {filepath}")
+
+    logging.info("Single-year file cleanup completed.")
 
 
 ##########################################################################################
@@ -333,16 +404,31 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         else:
             logging.info('Averaged data not found. Creating new file ...')
 
-    # otherwise read original data and perform averaging
+    # try find already merged files
+    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+    usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)    
+    
+    # determine which years are already covered by merged files
+    covered_years = set()
+    for b in usable_blocks:
+        # keep only years in the requested interval
+        for y in range(max(startyear, b["start"]), min(endyear, b["end"]) + 1):
+            covered_years.add(y)        
+
+    # Loop over requested years and create only missing ones
     for year in range(startyear, endyear + 1):
+
+        if year in covered_years:
+            logging.info(f"Skipping year (already covered by merged file): {year}")
+            continue
 
         # averaging only on missing single-year averaged files
         f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
         if os.path.exists(f) and not replace:
-            # skipping years
+            # skipping single years
             logging.info(f"Skipping year: {year}") 
         else:
-            # processing years
+            # processing single years
             logging.info(f"Processing year: {year}")    
             ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
             data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
@@ -361,7 +447,8 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         dry_run=False
     else:
         dry_run=True
-    cleaning(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
+    clean_merged_files(expname=expname, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
+    clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
 
     return data
 
