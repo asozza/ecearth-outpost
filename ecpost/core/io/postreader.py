@@ -166,14 +166,14 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     return ds
 
 
-def clean_merged_files(expname, varname, diagname, format, dry_run=True):
+def cleaning(expname, startyear, endyear, varname, diagname, format, dry_run=True):
     """
-    Pulizia intelligente dei file merged: identifica il file più lungo,
-    classifica tutti gli altri file come:
-      - contenuti completamente (ridondanti) -> cancellabili
-      - parzialmente sovrapposti
-      - disgiunti
-    Se dry_run=False cancella automaticamente i file completamente contenuti.
+    Smart cleaning of merged files and single annual files.
+    Identify and classify longest file and other files like:
+        - redundant files 
+        - partially overlapped files
+        - disjoined files
+    If dry_run=False clean up files automatically.
     """
 
     dirs = config.folders(expname)
@@ -236,6 +236,11 @@ def clean_merged_files(expname, varname, diagname, format, dry_run=True):
             except Exception as e:
                 logging.error(f"Failed to delete {fname}: {e}")
         logging.info("Cleanup completed.")
+
+        # clean single annual files
+        for year in range(startyear, endyear + 1):
+            filepath = os.path.join(dirs['post'], f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+            os.remove(filepath)
 
     return {"longest": longest,"contained": contained,"partial": partial,"disjoint": disjoint}
 
@@ -352,10 +357,11 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
 
     if cleanup:
-        logging.info(f"Clean up averaged single-year files ...") 
-        for year in range(startyear, endyear + 1):
-            filepath = os.path.join(dirs['post'], f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
-            shutil.rm(filepath)
+        logging.info(f"Cleaning ...")
+        dry_run=False
+    else:
+        dry_run=True
+    cleaning(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
 
     return data
 
