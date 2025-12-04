@@ -9,6 +9,7 @@ Date: Nov 2025
 """
 
 import os
+import re
 import shutil
 import logging
 import numpy as np
@@ -18,7 +19,6 @@ from ecpost.core.utils import config
 from ecpost.core.utils import catalogue   
 from ecpost.core.io.reader import reader_nemo_field
 from ecpost.core.means.means import spacemean, timemean
-
 
 # dictionary of months by seasons
 season_months = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}
@@ -74,7 +74,7 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
     return None
 
 
-def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
+def merge_annual_files_old(expname, startyear, endyear, varname, diagname, format):
     """
     Merge annual files
 
@@ -96,8 +96,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
 
     if not filelist:
         raise FileNotFoundError("No annual averaged files found.")
-
-    logging.info(f"Merging {len(filelist)} averaged annual files...")
+    logging.info(f"Merging {len(filelist)} annual averaged files...")
 
     # Merging annual files
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
@@ -105,6 +104,67 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
 
     return ds
+
+
+def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
+    """
+    Merge annual files into a single dataset, reusing merged files when possible.
+
+    Args:
+        expname: experiment name
+        startyear, endyear: time window
+        varname: variable name
+        diagname: diagnostics name
+        format: time format
+    """
+
+    dirs = config.folders(expname)
+    all_files = os.listdir(dirs['post'])
+
+    pattern = rf"{varname}_{expname}_(\d+)-(\d+)_{diagname}_{format}\.nc"
+    files_info = []
+
+    for f in all_files:
+        m = re.match(pattern, f)
+        if m:
+            y1, y2 = int(m.group(1)), int(m.group(2))
+            files_info.append((y1, y2, os.path.join(dirs['post'], f)))
+
+    merged_files = [(y1, y2, f) for y1, y2, f in files_info if y1 != y2]
+    annual_files = [(y1, f) for y1, y2, f in files_info if y1 == y2]
+
+    # Anni già coperti dai file merged
+    covered_years = set()
+    for y1, y2, _ in merged_files:
+        covered_years.update(range(y1, y2+1))
+
+    requested_years = set(range(startyear, endyear+1))
+    missing_years = requested_years - covered_years
+
+    # Preparare lista file da aprire
+    files_to_merge = []
+    for y1, y2, f in merged_files:
+        if set(range(y1, y2+1)) & requested_years:
+            files_to_merge.append(f)
+    for y, f in annual_files:
+        if y in missing_years:
+            files_to_merge.append(f)
+
+    if not files_to_merge:
+        raise FileNotFoundError("No files found for the requested interval.")
+
+    logging.info(f"Merging {len(files_to_merge)} files covering years {startyear}-{endyear}")
+    logging.info(f"Missing years merged from annual files: {sorted(missing_years)}")
+
+    # Aprire e concatenare dataset
+    ds = xr.open_mfdataset(files_to_merge, combine='by_coords')
+    
+    writer_averaged(data=ds, expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
+
+    logging.info(f"Merged file for {startyear}-{endyear} written successfully.")
+
+    return ds
+
 
 
 ##########################################################################################
@@ -196,20 +256,16 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
             logging.info('Averaged data not found. Creating new file ...')
 
     # otherwise read original data and perform averaging
-    single_year_files = []
-    missing_years = []
     for year in range(startyear, endyear + 1):
 
-        # first, search for existing single-year averaged files     
+        # averaging only on missing single-year averaged files
         f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
         if os.path.exists(f) and not replace:
-            single_year_files.append(f)
+            # skipping years
+            logging.info(f"Skipping year: {year}") 
         else:
-            missing_years.append(year)
-
-        # perform averaging only on missing single-year averaged files
-        if missing_years:
-            logging.info(f"Processing year {year}")    
+            # processing years
+            logging.info(f"Processing year: {year}")    
             ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
             data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
             writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
