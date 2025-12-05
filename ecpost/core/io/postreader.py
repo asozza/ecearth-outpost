@@ -393,11 +393,12 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     info = catalogue.observables('nemo')[varname]
 
     # try to read averaged data
+    averaged_exists = False
     try:
         if not replace:
             data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
             logging.info('Averaged data found.')
-            return data 
+            averaged_exists = True
         else:
             # When replace is True, skip checking for the file and recreate it
             raise FileNotFoundError  # Trigger the exception deliberately to skip reading of averaged file
@@ -407,51 +408,51 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         else:
             logging.info('Averaged data not found. Creating new file ...')
 
-    # try find already merged files
-    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
-    usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)    
+    if not averaged_exists:
+
+        # try find already merged files
+        longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+        usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)    
     
-    # determine which years are already covered by merged files
-    covered_years = set()
-    for b in usable_blocks:
-        # keep only years in the requested interval
-        for y in range(max(startyear, b["start"]), min(endyear, b["end"]) + 1):
-            covered_years.add(y)        
+        # determine which years are already covered by merged files
+        covered_years = set()
+        for b in usable_blocks:
+            # keep only years in the requested interval
+            for y in range(max(startyear, b["start"]), min(endyear, b["end"]) + 1):
+                covered_years.add(y)        
 
-    # Loop over requested years and create only missing ones
-    for year in range(startyear, endyear + 1):
+        # Loop over requested years and create only missing ones
+        for year in range(startyear, endyear + 1):
 
-        if year in covered_years:
-            logging.info(f"Skipping year (already covered by merged file): {year}")
-            continue
+            if year in covered_years:
+                logging.info(f"Skipping year (already covered by merged file): {year}")
+                continue
 
-        # averaging only on missing single-year averaged files
-        f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
-        if os.path.exists(f) and not replace:
-            # skipping single years
-            logging.info(f"Skipping year: {year}") 
-        else:
-            # processing single years
-            logging.info(f"Processing year: {year}")    
-            ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
-            data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
-            writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
-            try:
-                ds.close()
-            except:
-                pass
-            del ds
+            # averaging only on missing single-year averaged files
+            f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+            if os.path.exists(f) and not replace:
+                # skipping single years
+                logging.info(f"Skipping year: {year}") 
+            else:
+                # processing single years
+                logging.info(f"Processing year: {year}")    
+                ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
+                data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
+                writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
+                try:
+                    ds.close()
+                except:
+                    pass
+                del ds
 
-    logging.info(f"Merging averaged single-year files ...") 
-    data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
+        logging.info(f"Merging averaged single-year files ...") 
+        data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
 
     if cleanup:
         logging.info(f"Cleaning ...")
         dry_run=False
-    else:
-        dry_run=True
-    clean_merged_files(expname=expname, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
-    clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
+        clean_merged_files(expname=expname, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
+        clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
 
     return data
 
