@@ -222,12 +222,15 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     datasets = []
     for f in files_to_merge:
         logging.info(f"Opening: {os.path.basename(f)}")
-        ds = xr.open_dataset(f, decode_times=True)
+        time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
+        ds = xr.open_mfdataset(f, combine='by_coords', decode_times=time_coder)
         datasets.append(ds)
 
-    logging.info("Concatenating datasets...")
-    ds_out = xr.concat(datasets, dim="time")
+    logging.info("Concatenating datasets...")   
+    ds_out = xr.concat(datasets, dim="time", combine_attrs="drop_conflicts") 
     ds_out = ds_out.sortby("time")
+    # Safety: enforce cftime again on full concatenated dataset
+    ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
 
     # 5) Write merged output
     fout = os.path.join(postdir, f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}.nc")
