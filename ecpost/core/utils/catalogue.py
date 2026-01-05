@@ -135,7 +135,7 @@ def observables(component):
                     'long_name': 'Potential density', 
                     'dependencies': ['thetao', 'so'],
                     'operation': lambda thetao, so: _density(thetao, so)},
-            'woto': {'dim': '3D', 
+                'woto': {'dim': '3D', 
                      'grid': ['T', 'W'], 
                      'units': 'K*m/s', 
                      'long_name': 'Buoyancy flux', 
