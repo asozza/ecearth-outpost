@@ -139,8 +139,10 @@ def find_existing_merged(varname, expname, diagname, format):
 
     return longest, contained, partial, disjoint
 
+def overlaps(b, y1, y2):
+    return not (b["end"] < y1 or b["start"] > y2)
 
-def select_usable_blocks(longest, contained, partial, disjoint):
+def select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear):
     """
     Return a list of usable merged blocks, keeping:
       - the longest merged
@@ -151,6 +153,9 @@ def select_usable_blocks(longest, contained, partial, disjoint):
         return []
 
     blocks = [longest] + disjoint
+
+    # tieni solo quelli che intersecano l'intervallo richiesto
+    blocks = [b for b in blocks if overlaps(b, startyear, endyear)]
 
     # Remove blocks fully contained in others
     filtered = []
@@ -187,7 +192,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
 
     # 1) Find existing merged files
     longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
-    usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)
+    usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)
 
     # 2) Determine which years are covered by merged blocks
     covered_years = set()
@@ -410,9 +415,9 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
 
     if not averaged_exists:
 
-        # try find already merged files
+        # try find already merged files (sommething's wrong here!)
         longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
-        usable_blocks = select_usable_blocks(longest, contained, partial, disjoint)    
+        usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)    
     
         # determine which years are already covered by merged files
         covered_years = set()
