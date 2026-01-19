@@ -25,11 +25,12 @@ from ecpost.core.utils import catalogue
 
 axis_candidates = {
     'time': ['time_counter', 'time', 't'],
-    'x': ['x', 'x_grid_T', 'x_grid_U', 'x_grid_V', 'x_grid_W', 'lon', 'longitude', 'nav_lon'],
-    'y': ['y', 'y_grid_T', 'y_grid_U', 'y_grid_V', 'y_grid_W', 'lat', 'latitude', 'nav_lat'],
-    'z': ['deptht', 'depthu', 'depthv', 'depthw', 'depth', 'z', 'lev', 'nav_lev']
+    'x': ['x', 'x_grid_T', 'x_grid_T_inner', 'x_grid_U', 'x_grid_V', 'x_grid_W', 'lon', 'longitude', 'nav_lon'],
+    'y': ['y', 'y_grid_T', 'y_grid_T_inner', 'y_grid_U', 'y_grid_V', 'y_grid_W', 'lat', 'latitude', 'nav_lat'],
+    'z': ['deptht', 'depthu', 'depthv', 'depthw', 'depth', 'z', 'lev', 'nav_lev'],
+    'lon': ['nav_lon_grid_T', 'nav_lon'],
+    'lat': ['nav_lat_grid_T', 'nav_lat']
 }
-
 
 def detect_axis(ds, axis_type, where='dims', verbose=False):
     """
@@ -84,7 +85,7 @@ def _nemodict(grid, freq):
     if grid in ["T", "U", "V"]:
         return {
             grid: {
-                "preproc": preproc_nemo_new,
+                "preproc": preproc_nemo,
                 "format": f"oce_{freq}_{grid}",
                 "x_grid": [f"x_grid_{grid}", "x"],
                 "y_grid": [f"y_grid_{grid}", "y"],
@@ -99,7 +100,7 @@ def _nemodict(grid, freq):
         grid_lower = grid.lower()
         return {
             "W": {
-                "preproc": preproc_nemo_new,
+                "preproc": preproc_nemo,
                 "format": f"oce_{freq}_{grid}",
                 "nav_lat": ["nav_lat", "lat"],
                 "nav_lon": ["nav_lon", "lon"],
@@ -117,55 +118,44 @@ def _nemodict(grid, freq):
         raise ValueError(f"Unsupported grid type: {grid}")
 
 
-def preproc_nemo_new(ds, grid):
-    """Preprocessing NEMO: rimuove dimensioni spurie e uniforma gli assi."""
-    # Rimuove dimensioni di lunghezza 1
-    ds = ds.squeeze(drop=True)
-    if "iax_20C" in ds.coords:
-        ds = ds.drop_vars("iax_20C")
+def preproc_nemo(data):
+    """
+    General preprocessing routine for NEMO data.
+    Remove spurious dimensions/coordinates/variables and standardize axes.
 
-    # Trova gli assi
+    """
+
     axis_map = {}
     for ax in ['time', 'x', 'y', 'z']:
-        name = detect_axis(ds, ax, where='dims')
+        name = detect_axis(data, ax, where='dims')
         if name:
             axis_map[name] = ax
 
-    # Rinomina in modo coerente
+    for ax in ['lon', 'lat']:
+        name = detect_axis(data, ax, where='coords')
+        if name:
+            axis_map[name] = ax
+    
     if axis_map:
-        ds = ds.rename(axis_map)
+        data = data.rename(axis_map)
 
-    return ds
+    if "iax_20C" in data.coords:
+        data = data.drop_vars("iax_20C")
+        data = data.drop_dims("iax_20C")
 
+    if "time_centered" in data.coords:
+        data = data.drop_vars(["time_centered"])
 
-def preproc_nemo(data, grid):
-    """ 
-    General preprocessing routine for NEMO data based on grid type
-    
-    Args: 
-    data: dataset
-    grid: gridname [T, U, V, W]
+    if "axis_nbounds" in data.dims:
+        data = data.drop_dims(["axis_nbounds"])
 
-    """
-    
-    grid_mappings = _nemodict(grid, None)[grid]  # None for freq as it is not used here
+    if "x_grid_T_inner" in data.dims:
+        data = data.rename({"x_grid_T_inner": "x"})
 
-    if grid != 'W':
-        data = data.rename_dims({grid_mappings["x_grid"]: 'x', grid_mappings["y_grid"]: 'y'})
-        data = data.swap_dims({grid_mappings["x_grid_inner"]: 'x', grid_mappings["y_grid_inner"]: 'y'})
+    if "y_grid_T_inner" in data.dims:
+        data = data.rename({"y_grid_T_inner": "y"})
 
-    data = data.rename({
-        grid_mappings["nav_lat"]: 'lat', 
-        grid_mappings["nav_lon"]: 'lon', 
-        grid_mappings["depth"]: 'z', 
-        'time_counter': 'time'
-    })
-
-    # Drop spurious dimensions and variables
-    data = data.drop_vars(['time_centered'], errors='ignore')
-    data = data.drop_dims(['axis_nbounds'], errors='ignore')
-    if grid == 'T':
-        data = data.drop_dims(['iax_20C'], errors='ignore')
+    #data = data.squeeze(drop=True)
 
     return data
 
@@ -218,7 +208,7 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
 
     #logging.info('Files to be loaded %s', filelist)
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-    data = xr.open_mfdataset(filelist, preprocess=lambda d: dict[grid]["preproc"](d, grid), decode_times=time_coder, data_vars="all") #, chunks={'time_counter': 12})
+    data = xr.open_mfdataset(filelist, preprocess=lambda d: dict[grid]["preproc"](d), decode_times=time_coder, data_vars="all") #, chunks={'time_counter': 12})
 
     return data
 
