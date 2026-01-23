@@ -258,13 +258,13 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     # --------------------------------------------------
     # MERGE LOGIC
     # --------------------------------------------------
-    if diagname in ["timeseries", "hovmoller"]:    
+    if diagname in ("timeseries", "hovmoller"):
 
         ds_out = xr.concat(datasets, dim="time", combine_attrs="drop_conflicts")
         ds_out = ds_out.sortby("time")
         ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
 
-    elif diagname in ["profile", "map", "section"]:
+    elif diagname in ("profile", "map", "section"):
 
         # incremental weighted mean
         total_sum = None
