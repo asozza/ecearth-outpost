@@ -75,7 +75,7 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
 
 
 ##########################################################################################
-# merging functions
+# merging functions for timeseries
 
 def find_existing_merged(varname, expname, diagname, format):
     """
@@ -178,6 +178,18 @@ def select_usable_blocks(longest, contained, partial, disjoint, startyear, endye
 
     return filtered
 
+def parse_years_from_filename(fname):
+    """
+    Extract (start, end, weight) from filename
+    es: var_exp_2000-2009_profile.nc -> (2000, 2009, 10)
+    """
+    m = re.search(r"_(\d{4})-(\d{4})_", fname)
+    if not m:
+        raise ValueError(f"Cannot parse years from filename: {fname}")
+    y0 = int(m.group(1))
+    y1 = int(m.group(2))
+
+    return y0, y1, y1 - y0 + 1
 
 def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     """
@@ -223,21 +235,58 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     for f in files_to_merge:
         logging.info(f"  - {f}")
 
-    # 4) Open datasets and concatenate manually
+
+
+    # --------------------------------------------------
+    # OPENING FILES
+    # --------------------------------------------------
     datasets = []
+    weights = []
+
     for f in files_to_merge:
-        logging.info(f"Opening: {os.path.basename(f)}")
-        time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
-        ds = xr.open_mfdataset(f, combine='by_coords', decode_times=time_coder)
+        ds = xr.open_dataset(f)
+        _, _, w = parse_years_from_filename(os.path.basename(f))
         datasets.append(ds)
+        weights.append(w)
 
-    logging.info("Concatenating datasets...")   
-    ds_out = xr.concat(datasets, dim="time", combine_attrs="drop_conflicts") 
-    ds_out = ds_out.sortby("time")
-    # Safety: enforce cftime again on full concatenated dataset
-    ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
+    # --------------------------------------------------
+    # MERGE LOGIC
+    # --------------------------------------------------
+    if diagname == "timeseries":
 
-    # 5) Write merged output
+        ds_out = xr.concat(datasets, dim="time", combine_attrs="drop_conflicts")
+        ds_out = ds_out.sortby("time")
+        ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
+
+    elif diagname == "profile":
+
+        # incremental weighted mean
+        total_sum = None
+        total_weight = 0
+
+        for ds, w in zip(datasets, weights):
+            contrib = ds * w
+            if total_sum is None:
+                total_sum = contrib
+            else:
+                total_sum = total_sum + contrib
+            total_weight += w
+
+        ds_out = total_sum / total_weight
+
+        if "time" in ds_out:
+            ds_out = ds_out.drop_vars("time", errors="ignore")
+
+        # useful metadata
+        ds_out.attrs["n_years"] = np.int32(total_weight)
+        ds_out.attrs["merged_range"] = f"{startyear}-{endyear}"
+
+    else:
+        raise NotImplementedError(f"Unknown diagname: {diagname}")
+
+    # --------------------------------------------------
+    # WRITE MERGED OUTPUT
+    # --------------------------------------------------
     fout = os.path.join(postdir, f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}.nc")
     logging.info(f"Writing merged dataset to: {fout}")
     ds_out.to_netcdf(fout)
