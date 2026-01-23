@@ -23,6 +23,14 @@ from ecpost.core.means.means import spacemean, timemean
 # dictionary of months by seasons
 season_months = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}
 
+MERGE_RULES = {
+    "timeseries": "concat",
+    "hovmoller": "concat",
+    "profile": "mean",
+    "map": "mean",
+    "section": "mean"
+}
+
 ##########################################################################################
 # I/O for averaged data
 
@@ -235,8 +243,6 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     for f in files_to_merge:
         logging.info(f"  - {f}")
 
-
-
     # --------------------------------------------------
     # OPENING FILES
     # --------------------------------------------------
@@ -252,13 +258,13 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     # --------------------------------------------------
     # MERGE LOGIC
     # --------------------------------------------------
-    if diagname == "timeseries":
+    if diagname in ["timeseries", "hovmoller"]:    
 
         ds_out = xr.concat(datasets, dim="time", combine_attrs="drop_conflicts")
         ds_out = ds_out.sortby("time")
         ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
 
-    elif diagname == "profile":
+    elif diagname in ["profile", "map", "section"]:
 
         # incremental weighted mean
         total_sum = None
