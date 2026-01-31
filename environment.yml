@@ -13,11 +13,13 @@ dependencies:
   - xarray
   - dask
   - cdo=2.4.0
-  - matplotlib
-  - seaborn
   - netcdf4
   - nc-time-axis
   - cftime
+  - matplotlib
+  - seaborn
+  - cartopy 
+  - cmocean
   - gsw
   - psutil
   - pip
