@@ -87,3 +87,72 @@ def profile(expname, startyear, endyear, varname,
         plt.savefig(os.path.join(dirs['osprey'], figname))
 
     return pp
+
+def profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, 
+            reader="post", orca="ORCA2", replace=False,
+            color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
+    """ 
+    Graphics of averaged vertical profile 
+    
+    Positional Args:
+    - expname: experiment name
+    - startyear,endyear: time window
+    - varname: variable name
+
+    Optional Args:
+    - reader: read the original raw data or averaged data ['nemo', 'post']
+    - replace: replace existing files [False or True]
+    
+    Optional Args for figure settings:
+    - rescale: rescale by initial value
+    - color, linestyle, marker, label: plot attributes
+    - figname: save plot to file
+
+    """
+
+    info = catalogue.observables('nemo')[varname]
+
+    # Read data from raw NEMO output
+    if reader == 'nemo':
+        data1 = reader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1)
+        vec = timemean(data=data1, format='global')
+        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
+        #
+        data2 = reader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2)
+        vec = timemean(data=data2, format='global')
+        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
+
+    # Read data from post-processed data
+    if reader == 'post':
+        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, 
+                            diagname='profile', format='global', orca=orca, replace=replace)
+        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, 
+                            diagname='profile', format='global', orca=orca, replace=replace)
+        diff = data2[varname] - data1[varname]
+        vec=diff.values.flatten()
+
+    # fixing depth y-axis
+    zvec = data1['z'].values.flatten()
+
+    # load plot features
+    plot_kwargs = {}
+    if color:
+        plot_kwargs['color'] = color
+    if linestyle:
+        plot_kwargs['linestyle'] = linestyle
+    if marker:
+        plot_kwargs['marker'] = marker
+    if label:
+        plot_kwargs['label'] = label
+
+    # plot profile
+    pp = plt.plot(vec, -zvec, **plot_kwargs)
+    plt.xlabel(f"{info['long_name']} Difference [{info['units']}]")
+    plt.ylabel(f'Depth [{info['units']}]')
+
+    # Save figure
+    if figname:
+        dirs = config.paths()
+        plt.savefig(os.path.join(dirs['figs'], figname))
+
+    return pp
