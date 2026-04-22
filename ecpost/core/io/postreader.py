@@ -18,7 +18,7 @@ import xarray as xr
 from ecpost.core.utils import config
 from ecpost.core.utils import catalogue   
 from ecpost.core.io.reader import reader_nemo_field
-from ecpost.core.means.means import spacemean, timemean
+from ecpost.core.means.means import apply_cost_function, spacemean, timemean
 
 # dictionary of months by seasons
 season_months = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}
@@ -34,7 +34,7 @@ MERGE_RULES = {
 ##########################################################################################
 # I/O for averaged data
 
-def reader_averaged(expname, startyear, endyear, varname, diagname, format):
+def reader_averaged(expname, startyear, endyear, varname, diagname, format, metric):
     """ 
     Reader of averaged data 
     
@@ -44,12 +44,13 @@ def reader_averaged(expname, startyear, endyear, varname, diagname, format):
         varname: variable name
         diagname: diagnostics name [series, prof, hovm, map, fld, pdf]
         format: time format [plain, global, monthly, seasonally, yearly]
+        metric: metrics [base, diff, ...]
     
     """
 
     dirs = config.folders(expname)
 
-    filename = f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}"
+    filename = f"{expname}_{startyear}-{endyear}_{varname}_{diagname}_{format}_{metric}"
     filename = os.path.join(dirs['post'], f"{filename}.nc")
 
     logging.info('File to be loaded %s', filename)
@@ -58,7 +59,7 @@ def reader_averaged(expname, startyear, endyear, varname, diagname, format):
     return data
 
 
-def writer_averaged(data, expname, startyear, endyear, varname, diagname, format):
+def writer_averaged(data, expname, startyear, endyear, varname, diagname, format, metric, refinfo):
     """ 
     Writer of averaged data 
     
@@ -69,23 +70,35 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
         varname: variable name
         diagname: diagnostics name [series, prof, hovm, map, fld, pdf]
         format: time format [plain, global, monthly, seasonally, yearly]
-    
+        metric: metrics [base, diff, ...]             
     """
 
     dirs = config.folders(expname)
-    filename = f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}"
+    filename = f"{expname}_{startyear}-{endyear}_{varname}_{diagname}_{format}_{metric}"
     filename = os.path.join(dirs['post'], f"{filename}.nc")
+
+    if metric != 'base':
+        data = _update_description(data, refinfo)
 
     logging.info('File to be loaded %s', filename)
     data.to_netcdf(filename, mode='w', engine='netcdf4', format='NETCDF4')
 
     return None
 
+def _update_description(data, refinfo):
+
+    description = data.attrs.get('description', 'No description')
+    if 'refinfo' in locals() and isinstance(refinfo, dict):
+        refinfo_str = ', '.join([f"{key}: {value}" for key, value in refinfo.items()])
+        description += f" {refinfo_str}"
+    data.attrs['description'] = description
+
+    return data
 
 ##########################################################################################
 # merging functions for timeseries
 
-def find_existing_merged(varname, expname, diagname, format):
+def find_existing_merged(varname, expname, diagname, format, metric):
     """
     Scan the post directory for merged files of a given variable,
     classify them into:
@@ -97,7 +110,7 @@ def find_existing_merged(varname, expname, diagname, format):
     dirs = config.folders(expname)
     postdir = dirs['post']
 
-    pattern = re.compile(rf"{re.escape(varname)}_{re.escape(expname)}_(\d+)-(\d+)_{diagname}_{format}\.nc")
+    pattern = re.compile(rf"{re.escape(expname)}_(\d+)-(\d+)_{re.escape(varname)}_{diagname}_{format}_{metric}\.nc")
 
     merged = []
     for fname in os.listdir(postdir):
@@ -199,7 +212,7 @@ def parse_years_from_filename(fname):
 
     return y0, y1, y1 - y0 + 1
 
-def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
+def merge_annual_files(expname, startyear, endyear, varname, diagname, format, metric):
     """
     Merge single-year files and usable merged blocks into a single dataset.
     Ensures no overlapping time coordinates and chronological order.
@@ -208,10 +221,10 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     postdir = dirs['post']
 
     # Pattern for single-year files
-    single_pattern = f"{varname}_{expname}_{{year}}-{{year}}_{diagname}_{format}.nc"
+    single_pattern = f"{expname}_{{year}}-{{year}}_{varname}_{diagname}_{format}_{metric}.nc"
 
     # 1) Find existing merged files
-    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format, metric)
     usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)
 
     # 2) Determine which years are covered by merged blocks
@@ -293,7 +306,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     # --------------------------------------------------
     # WRITE MERGED OUTPUT
     # --------------------------------------------------
-    fout = os.path.join(postdir, f"{varname}_{expname}_{startyear}-{endyear}_{diagname}_{format}.nc")
+    fout = os.path.join(postdir, f"{expname}_{startyear}-{endyear}_{varname}_{diagname}_{format}_{metric}.nc")
     logging.info(f"Writing merged dataset to: {fout}")
     ds_out.to_netcdf(fout)
     logging.info("Merge complete.")
@@ -301,7 +314,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format):
     return ds_out
 
 
-def clean_merged_files(expname, varname, diagname, format, dry_run=True):
+def clean_merged_files(expname, varname, diagname, format, metric, dry_run=True):
     """
     Clean up redundant merged files:
       - keeps the longest merged
@@ -311,7 +324,7 @@ def clean_merged_files(expname, varname, diagname, format, dry_run=True):
     dirs = config.folders(expname)
     postdir = dirs['post']
 
-    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+    longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format, metric)
 
     if not longest:
         logging.info("No merged files found to clean.")
@@ -344,7 +357,7 @@ def clean_merged_files(expname, varname, diagname, format, dry_run=True):
     return summary
 
 
-def clean_annual_files(expname, startyear, endyear, varname, diagname, format, dry_run=True):
+def clean_annual_files(expname, startyear, endyear, varname, diagname, format, metric, dry_run=True):
     """
     Delete single-year files for a given variable and experiment.
 
@@ -363,7 +376,7 @@ def clean_annual_files(expname, startyear, endyear, varname, diagname, format, d
     logging.info(f"{'Dry run: would delete' if dry_run else 'Deleting'} single-year files for {varname} {startyear}-{endyear}:")
 
     for year in range(startyear, endyear + 1):
-        filepath = os.path.join(postdir, f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+        filepath = os.path.join(postdir, f"{expname}_{year}-{year}_{varname}_{diagname}_{format}_{metric}.nc")
         if os.path.exists(filepath):
             if dry_run:
                 logging.info(f"  - {filepath}")
@@ -390,6 +403,7 @@ def averaging(data, varname, diagname, format, orca):
         varname: variable name
         diagname: diagnostics name [scalar, timeseries, profile, hovmoller, map, field, pdf?]
         format: time format [plain, global, monthly, seasonally, yearly]
+        metric: metrics [base, diff, etc...]
         orca: ORCA configuration <ORCA2, eORCA1>
     
     """
@@ -408,7 +422,7 @@ def averaging(data, varname, diagname, format, orca):
 
     # vertical profile
     if (diagname == 'profile' and info['dim'] == '3D'):        
-        data = timemean(data=data, format='global', use_cftime=True)
+        data = timemean(data=data, format='global')
         data = spacemean(data=data, ndim='2D', orca=orca)
 
     # hovmoller diagram
@@ -434,7 +448,7 @@ def averaging(data, varname, diagname, format, orca):
 ##########################################################################################
 ##########################################################################################
 # MAIN FUNCTION
-def postreader_nemo(expname, startyear, endyear, varname, diagname, format='global', orca='ORCA2', replace=False, cleanup=False):
+def postreader_nemo(expname, startyear, endyear, varname, diagname, format='global', metric='base', refinfo=None, orca='ORCA2', replace=False, cleanup=False):
     """ 
     Postreader_nemo: main function for reading averaged data
     
@@ -444,6 +458,8 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         varname: variable name
         diagname: diagnostics name [series, prof, hovm, map, fld, pdf]
         format: time format [plain, global, monthly, seasonally, yearly]
+        metric: ['base', 'diff']
+        refinfo: [rexpname, rstartyear, rendyear]
         orca: ORCA configuration [ORCA2, eORCA1]
         replace: replace existing averaged file [False or True]
     
@@ -456,7 +472,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     averaged_exists = False
     try:
         if not replace:
-            data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
+            data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, metric=metric)
             logging.info('Averaged data found.')
             averaged_exists = True
         else:
@@ -471,7 +487,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     if not averaged_exists:
 
         # try find already merged files (sommething's wrong here!)
-        longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format)
+        longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format, metric)
         usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)    
     
         # determine which years are already covered by merged files
@@ -489,7 +505,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
                 continue
 
             # averaging only on missing single-year averaged files
-            f = os.path.join(dirs['post'],f"{varname}_{expname}_{year}-{year}_{diagname}_{format}.nc")
+            f = os.path.join(dirs['post'],f"{expname}_{year}-{year}_{varname}_{diagname}_{format}_{metric}.nc")
             if os.path.exists(f) and not replace:
                 # skipping single years
                 logging.info(f"Skipping year: {year}") 
@@ -497,8 +513,13 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
                 # processing single years
                 logging.info(f"Processing year: {year}")    
                 ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
+                if metric != 'base':
+                    ds_ref = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
+                    ds = apply_cost_function(ds, ds_ref, metric, format=format, format_ref=refinfo['format'])
                 data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
-                writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format)
+                writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format, metric=metric, refinfo=refinfo)
+
+                # end loop
                 try:
                     ds.close()
                 except:
@@ -506,13 +527,13 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
                 del ds
 
         logging.info(f"Merging averaged single-year files ...") 
-        data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format)
+        data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, metric=metric)
 
     if cleanup:
         logging.info(f"Cleaning ...")
         dry_run=False
-        clean_merged_files(expname=expname, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
-        clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, dry_run=dry_run)
+        clean_merged_files(expname=expname, varname=varname, diagname=diagname, format=format, metric=metric, dry_run=dry_run)
+        clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, metric=metric, dry_run=dry_run)
 
     return data
 
