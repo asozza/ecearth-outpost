@@ -438,7 +438,7 @@ def averaging(data, varname, diagname, format, orca):
         if info['dim'] == '3D':
             data = spacemean(data=data, ndim='1D', orca=orca)      
 
-    # time-averaged spatial-only field 
+    # time-averaged spatial-only field, format='global'
     if diagname == 'field':
         data = timemean(data=data, format=format)
 
@@ -467,9 +467,34 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
 
     dirs = config.folders(expname)
     info = catalogue.observables('nemo')[varname]
+    
+    #################################
+    # compute climatology (3D field)
+    reference_exists = False
+    ds_ref = None
+    if metric != 'base':
+        try:
+            if not replace:
+                ds_ref = reader_averaged(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname, diagname='field', format='global', metric='base')
+                logging.info('Reference data found.')
+                reference_exists = True
+            else:
+                raise FileNotFoundError  # Trigger the exception deliberately to skip reading of averaged file
+        except FileNotFoundError:
+            if replace:
+                logging.info('Reference data to be replaced. Creating new file ...')
+            else:
+                logging.info('Reference data not found. Creating new file ...')    
+        # create new climatology
+        if not reference_exists:
+            ds_ref = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
+            ds_ref = averaging(data=ds_ref, varname=varname, diagname='field', format='global', orca=orca)
+            writer_averaged(data=ds_ref, expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname, diagname='field', format='global', metric='base', refinfo=None)
+            logging.info('Reference data saved ...')   
 
+    #################################
     # try to read averaged data
-    averaged_exists = False
+    averaged_exists = False    
     try:
         if not replace:
             data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname=diagname, format=format, metric=metric)
@@ -489,7 +514,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
         # try find already merged files (sommething's wrong here!)
         longest, contained, partial, disjoint = find_existing_merged(varname, expname, diagname, format, metric)
         usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)    
-    
+
         # determine which years are already covered by merged files
         covered_years = set()
         for b in usable_blocks:
@@ -514,8 +539,7 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
                 logging.info(f"Processing year: {year}")    
                 ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
                 if metric != 'base':
-                    ds_ref = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
-                    ds = apply_cost_function(ds, ds_ref, metric, format=format, format_ref=refinfo['format'])
+                    ds = apply_cost_function(data=ds, data_ref=ds_ref, metric=metric)
                 data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
                 writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format, metric=metric, refinfo=refinfo)
 

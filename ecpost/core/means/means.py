@@ -366,7 +366,7 @@ def cost(x, x0, metric):
         raise ValueError(f"Unknown metric: {metric}")
 
 
-def apply_cost_function(data, data_ref, metric, format='plain', format_ref='global'):
+def apply_cost_function(data, data_ref, metric):
     """
     Apply a cost function to data based on formats.
 
@@ -375,44 +375,11 @@ def apply_cost_function(data, data_ref, metric, format='plain', format_ref='glob
         data_ref (xarray.DataArray): The reference dataset.
         metric (str): The metric used to compute the cost.b
         format (str, optional): Time format of the current dataset ['plain', 'monthly', 'seasonally', 'yearly', 'global'].
-        format_ref (str, optional): Time format of the reference dataset.
-
     Returns:
         xarray.DataArray: Data containing the computed cost metrics.
     """
 
-    if format_ref == 'global': 
-        cdata = cost(data, data_ref, metric)
-
-    elif format == format_ref:
-        cdata = cost(data, data_ref, metric)
-
-    elif (format == 'monthly' and format_ref == 'seasonally'):
-        cdata = cost(data, data_ref, metric)
-
-    elif format == 'plain':
-
-        if format_ref in ['monthly', 'seasonally']:
-            n_years = int(data['time'].size/12)
-            start_year = data['time.year'][-1]
-            varname = list(data.data_vars)[0]
-            data_ref_repeated = np.tile(data_ref[varname].values, n_years)
-            data_ref_new = xr.Dataset({varname: (["time"], data_ref_repeated)}, coords={"time": data['time']})
-            cdata = cost(data, data_ref_new, metric)
-
-        elif format_ref == 'yearly':
-            if (data['time'].size/12 == data_ref['time'].size):
-                n_years = data_ref["time"].size
-                start_year = int(data_ref["time.year"][0])
-                varname = list(data.data_vars)[0]
-                data_ref_repeated = np.repeat(data_ref[varname].values, 12)
-                data_ref_new = xr.Dataset({varname: (["time"], data_ref_repeated)}, coords={"time": data['time']})
-                cdata = cost(data, data_ref_new, metric)
-            else:
-                raise ValueError("data and data_ref have different sizes.")
-        
-    else:
-        raise ValueError(f"Wrong combination of {format} and {format_ref}")
+    cdata = cost(data, data_ref, metric)
 
     return cdata
 
