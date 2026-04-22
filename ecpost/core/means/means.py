@@ -79,7 +79,7 @@ def cumave(ydata):
 # space_mean:   space average
 #
 
-def timemean(data, format='global', use_cftime=True):
+def timemean(data, format='global'):
     """ 
     Time average of a field with various options
     
@@ -114,99 +114,17 @@ def timemean(data, format='global', use_cftime=True):
         # Average by month across years
         ave = data.groupby('time.month').mean(dim='time')
         
-        if use_cftime:            
-            # create cftime array of dates
-            last_year = data['time.year'].values[-1]
-            dates = [cftime.DatetimeGregorian(last_year, month, 15, 12, 0, 0, has_year_zero=False) for month in range(1, 13)]
-            
-            # create new time coordinate (space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-            
-            # replace name: 'month' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "month"]
-
-            # combine all in a new array
-            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
-
-
     elif format == 'seasonally':
         # Average by season (DJF, MAM, JJA, SON) across years
         ave = data.groupby('time.season').mean(dim='time')
 
-        if use_cftime:
-
-            # create cftime array of dates
-            last_year = data['time.year'].values[-1]
-            dates = [cftime.DatetimeGregorian(last_year, month, 15, 12, 0, 0, has_year_zero=False) for month in range(1, 13)]
-
-            # create new coordinates (space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-
-            # spread seasonal values across all months 
-            values = []
-            for month in range(1, 13):
-                for season, months in season_months.items():
-                    if month in months:
-                        values.append(ave.sel(season=season))
-                        break
-
-            # replace name: 'season' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "season"]
-
-            # put all in a new array
-            ave = xr.DataArray(data=values, dims=new_dims, coords=coords)
-
-
     elif format == 'yearly':
         # Average by year
         ave = data.groupby('time.year').mean(dim='time')
-        
-        if use_cftime:
-            dates = [cftime.DatetimeGregorian(year, 7, 1, 0, 0, 0, has_year_zero=False) for year in ave['year'].values]
-
-            # create new coordinates ( space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-            
-            # replace name: 'year' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "year"]
-
-            # combine all in a new array
-            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
-
 
     elif format == 'seasons' or format in season_months:
         # Average by seasons over years        
         ave = data.groupby(['time.year', 'time.season']).mean(dim='time')
-
-        if use_cftime:
-            
-            season_times = []            
-            for (year, season), group in data.groupby(['time.year', 'time.season']):            
-                # Determine the center month of the season
-                if season in season_months:
-                    center_month = season_months[season][1]
-                else:
-                    raise ValueError(f"Unknown season: {season}")
-
-                # Create a cftime object for the center of the season
-                center_time = cftime.DatetimeGregorian(year, center_month, 15, 12, 0, 0, has_year_zero=False)
-                season_times.append(center_time)
-            
-            season_times = sorted(season_times)
-            season_times = xr.DataArray(season_times, dims=['time'], name='time', coords={'time': season_times})
-            
-            ave = ave.stack(time=("year", "season"))
-            ave = ave.drop_vars(['year','season'])
-            ave['time'] = season_times
         
         # reorder dimensions
         ave = ave.transpose(*data.dims)
