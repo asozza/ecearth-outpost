@@ -442,6 +442,8 @@ def calculate_climate_metric(x, x0, metric, mode='local', dims=('lat', 'lon')):
     raise ValueError(f"Metrica '{metric}' non supportata o modalità '{mode}' non valida.")
 
 
+### AGGIUNGERE KL-DIVERGENCE E SPOSTARE TUTTO IN UN ALTRO FILE, AD ES. metrics.py 
+
 ################################################################################################################
 
 def year_shift(x1, y1, x2, y2, shift_threshold=20.0):
