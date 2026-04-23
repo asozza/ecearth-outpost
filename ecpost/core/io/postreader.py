@@ -36,14 +36,9 @@ MERGE_RULES = {
 # I/O for averaged data
 
 def get_output_path(postdir, expname, startyear, endyear, varname, diagname, format, metric='base'):
-    """
-    Costruisce il percorso del file di output basato sui parametri forniti.
-    Il parametro metric ha come default 'base' per gestire il caso comune.
-    """
-    # Determina il suffisso da aggiungere solo se metric è diverso da 'base'
-    suffix = f"_{metric}" if metric != 'base' else ""
+    """get output file path"""
     
-    # Costruisce il nome del file
+    suffix = f"_{metric}" if metric != 'base' else ""
     filename = f"{expname}_{startyear}-{endyear}_{varname}_{diagname}_{format}{suffix}.nc"
     
     return os.path.join(postdir, filename)
@@ -89,11 +84,13 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, format
     dirs = config.folders(expname)
     filename = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, format, metric)
     logging.info('File to be loaded %s', filename)
+    if metric != 'base' and refinfo is not None:
+        data = update_description(data, refinfo)
     data.to_netcdf(filename, mode='w', engine='netcdf4', format='NETCDF4')
 
     return None
 
-def _update_description(data, refinfo):
+def update_description(data, refinfo):
 
     description = data.attrs.get('description', 'No description')
     if 'refinfo' in locals() and isinstance(refinfo, dict):
@@ -233,12 +230,11 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format, m
     """
     dirs = config.folders(expname)
     postdir = dirs['post']
-    single_pattern = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, format, metric)    
 
     # 1) Find existing merged files
     longest, contained, partial, disjoint = find_existing_merged(expname, varname, diagname, format, metric)
     usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)
-
+    
     # 2) Determine which years are covered by merged blocks
     covered_years = set()
     for b in usable_blocks:
@@ -255,6 +251,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format, m
     files_to_merge = [b["file"] for b in usable_blocks]
 
     for y in missing_years:
+        single_pattern = get_output_path(dirs['post'], expname, y, y, varname, diagname, format, metric) 
         fpath = os.path.join(postdir, single_pattern.format(year=y))
         if not os.path.exists(fpath):
             raise FileNotFoundError(f"Missing single-year file: {fpath}")
@@ -564,6 +561,10 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     dirs = config.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
+    ds_ref = None    
+    if metric != 'base' and refinfo is not None:        
+        ds_ref = get_climatology(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
+
     #################################
     # try to read averaged data
     averaged_exists = False    
@@ -609,9 +610,8 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
             else:
                 # processing single years
                 logging.info(f"Processing year: {year}")
-                ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
-                if metric != 'base':
-                    ds_ref = get_climatology(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
+                ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)                
+                if metric != 'base' and refinfo is not None:
                     ds = apply_cost_function(data=ds, data_ref=ds_ref, metric=metric)
                 data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
                 writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format, metric=metric, refinfo=refinfo)
@@ -637,4 +637,3 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
 
 ##########################################################################################
 ##########################################################################################
-
