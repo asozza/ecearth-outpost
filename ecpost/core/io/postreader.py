@@ -28,13 +28,12 @@ MERGE_RULES = {
     "hovmoller": "concat",
     "profile": "mean",
     "map": "mean",
-    "section": "mean"
+    "section": "mean",
+    "field": "mean"
 }
 
 ##########################################################################################
 # I/O for averaged data
-
-import os
 
 def get_output_path(postdir, expname, startyear, endyear, varname, diagname, format, metric='base'):
     """
@@ -171,8 +170,10 @@ def find_existing_merged(expname, varname, diagname, format, metric='base'):
 
     return longest, contained, partial, disjoint
 
+
 def overlaps(b, y1, y2):
     return not (b["end"] < y1 or b["start"] > y2)
+
 
 def select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear):
     """
@@ -210,6 +211,7 @@ def select_usable_blocks(longest, contained, partial, disjoint, startyear, endye
 
     return filtered
 
+
 def parse_years_from_filename(fname):
     """
     Extract (start, end, weight) from filename
@@ -222,6 +224,7 @@ def parse_years_from_filename(fname):
     y1 = int(m.group(2))
 
     return y0, y1, y1 - y0 + 1
+
 
 def merge_annual_files(expname, startyear, endyear, varname, diagname, format, metric='base'):
     """
@@ -286,7 +289,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, format, m
         ds_out = ds_out.sortby("time")
         ds_out = ds_out.convert_calendar("gregorian", use_cftime=True)
 
-    elif diagname in ("profile", "map", "section"):
+    elif diagname in ("profile", "map", "section", "field"):
 
         # incremental weighted mean
         total_sum = None
@@ -451,55 +454,95 @@ def averaging(data, varname, diagname, format, orca):
 
     return data
 
-##########################################################################################
+
+######################################################################################################
 def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=False, cleanup=False):
     """ 
-    Get climatological reference 
-    
+    Get climatological reference field.
+
     Args:
         expname: experiment name
         startyear,endyear: time window
         varname: variable name
-        diagname: diagnostics name [series, prof, hovm, map, fld, pdf]
-        format: time format [plain, global, monthly, seasonally, yearly]
-        metric: ['base', 'diff']
-        refinfo: [rexpname, rstartyear, rendyear, varname]
         orca: ORCA configuration [ORCA2, eORCA1]
         replace: replace existing averaged file [False or True]
-    
+        cleanup: clean single-year files and other merged files
+
     """
 
     dirs = config.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
     #################################
-    # compute climatology (3D field)
-    reference_exists = False
+    # try to read averaged data
+    reference_exists = False    
     try:
         if not replace:
-            ds_ref = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                                     diagname='field', format='global', metric='base')
+            data = reader_averaged(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname='field', format='global', metric='base')
             logging.info('Reference data found.')
             reference_exists = True
         else:
-            raise FileNotFoundError
+            # When replace is True, skip checking for the file and recreate it
+            raise FileNotFoundError  # Trigger the exception deliberately to skip reading of averaged file
     except FileNotFoundError:
         if replace:
             logging.info('Reference data to be replaced. Creating new file ...')
         else:
-            logging.info('Reference data not found. Creating new file ...')    
+            logging.info('Reference data not found. Creating new file ...')
 
-    # create new climatology
     if not reference_exists:
-        ds_ref = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
-        ds_ref = averaging(data=ds_ref, varname=varname, diagname='field', format='global', orca=orca)
-        writer_averaged(data=ds_ref, expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                        diagname='field', format='global', metric='base', refinfo=None)
-        logging.info('Reference data saved ...')   
+
+        # try find already merged files (sommething's wrong here!)
+        longest, contained, partial, disjoint = find_existing_merged(expname, varname, diagname='field', format='global')
+        usable_blocks = select_usable_blocks(longest, contained, partial, disjoint, startyear, endyear)
+
+        # determine which years are already covered by merged files
+        covered_years = set()
+        for b in usable_blocks:
+            # keep only years in the requested interval
+            for y in range(max(startyear, b["start"]), min(endyear, b["end"]) + 1):
+                covered_years.add(y)
+
+        # Loop over requested years and create only missing ones
+        for year in range(startyear, endyear + 1):
+
+            if year in covered_years:
+                logging.info(f"Skipping year (already covered by merged file): {year}")
+                continue
+
+            # averaging only on missing single-year averaged files
+            f = get_output_path(dirs['post'], expname, year, year, varname, diagname='field', format='global')
+            if os.path.exists(f) and not replace:
+                # skipping single years
+                logging.info(f"Skipping year: {year}") 
+            else:
+                # processing single years
+                logging.info(f"Processing year: {year}")
+                ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
+                data = averaging(data=ds, varname=varname, diagname='field', format='global', orca=orca)
+                writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname='field', format='global', metric='base')
+
+                # end loop
+                try:
+                    ds.close()
+                except:
+                    pass
+                del ds
+
+        logging.info(f"Merging averaged single-year files ...") 
+        data = merge_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname='field', format='global')
+
+    if cleanup:
+        logging.info(f"Cleaning ...")
+        dry_run=False
+        clean_merged_files(expname=expname, varname=varname, diagname='field', format='global', metric='base', dry_run=dry_run)
+        clean_annual_files(expname=expname, startyear=startyear, endyear=endyear, varname=varname, diagname='field', format='global', metric='base', dry_run=dry_run)
+
+    return data
 
 
-##########################################################################################
-##########################################################################################
+##############################################################################################################################################################
+##############################################################################################################################################################
 # MAIN FUNCTION
 def postreader_nemo(expname, startyear, endyear, varname, diagname, format='global', metric='base', refinfo=None, orca='ORCA2', replace=False, cleanup=False):
     """ 
@@ -521,30 +564,6 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
     dirs = config.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
-    #################################
-    # compute climatology (3D field)
-    reference_exists = False
-    ds_ref = None
-    if metric != 'base':
-        try:
-            if not replace:
-                ds_ref = reader_averaged(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname, diagname='field', format='global', metric='base')
-                logging.info('Reference data found.')
-                reference_exists = True
-            else:
-                raise FileNotFoundError  # Trigger the exception deliberately to skip reading of averaged file
-        except FileNotFoundError:
-            if replace:
-                logging.info('Reference data to be replaced. Creating new file ...')
-            else:
-                logging.info('Reference data not found. Creating new file ...')    
-        # create new climatology
-        if not reference_exists:
-            ds_ref = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
-            ds_ref = averaging(data=ds_ref, varname=varname, diagname='field', format='global', orca=orca)
-            writer_averaged(data=ds_ref, expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname, diagname='field', format='global', metric='base', refinfo=None)
-            logging.info('Reference data saved ...')   
-
     #################################
     # try to read averaged data
     averaged_exists = False    
@@ -589,9 +608,10 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, format='glob
                 logging.info(f"Skipping year: {year}") 
             else:
                 # processing single years
-                logging.info(f"Processing year: {year}")    
+                logging.info(f"Processing year: {year}")
                 ds = reader_nemo_field(expname=expname, startyear=year, endyear=year, varname=varname)
                 if metric != 'base':
+                    ds_ref = get_climatology(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
                     ds = apply_cost_function(data=ds, data_ref=ds_ref, metric=metric)
                 data = averaging(data=ds, varname=varname, diagname=diagname, format=format, orca=orca)
                 writer_averaged(data=data, expname=expname, startyear=year, endyear=year, varname=varname, diagname=diagname, format=format, metric=metric, refinfo=refinfo)
