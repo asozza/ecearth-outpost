@@ -15,7 +15,7 @@ import logging
 import netCDF4 as nc
 import xarray as xr
 
-from accelerator.utils import config
+from ecpost.core.utils import config
 
 ##########################################################################################
 
