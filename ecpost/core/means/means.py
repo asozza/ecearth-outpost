@@ -79,7 +79,7 @@ def cumave(ydata):
 # space_mean:   space average
 #
 
-def timemean(data, format='global', use_cftime=True):
+def timemean(data, format='global'):
     """ 
     Time average of a field with various options
     
@@ -114,99 +114,17 @@ def timemean(data, format='global', use_cftime=True):
         # Average by month across years
         ave = data.groupby('time.month').mean(dim='time')
         
-        if use_cftime:            
-            # create cftime array of dates
-            last_year = data['time.year'].values[-1]
-            dates = [cftime.DatetimeGregorian(last_year, month, 15, 12, 0, 0, has_year_zero=False) for month in range(1, 13)]
-            
-            # create new time coordinate (space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-            
-            # replace name: 'month' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "month"]
-
-            # combine all in a new array
-            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
-
-
     elif format == 'seasonally':
         # Average by season (DJF, MAM, JJA, SON) across years
         ave = data.groupby('time.season').mean(dim='time')
 
-        if use_cftime:
-
-            # create cftime array of dates
-            last_year = data['time.year'].values[-1]
-            dates = [cftime.DatetimeGregorian(last_year, month, 15, 12, 0, 0, has_year_zero=False) for month in range(1, 13)]
-
-            # create new coordinates (space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-
-            # spread seasonal values across all months 
-            values = []
-            for month in range(1, 13):
-                for season, months in season_months.items():
-                    if month in months:
-                        values.append(ave.sel(season=season))
-                        break
-
-            # replace name: 'season' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "season"]
-
-            # put all in a new array
-            ave = xr.DataArray(data=values, dims=new_dims, coords=coords)
-
-
     elif format == 'yearly':
         # Average by year
         ave = data.groupby('time.year').mean(dim='time')
-        
-        if use_cftime:
-            dates = [cftime.DatetimeGregorian(year, 7, 1, 0, 0, 0, has_year_zero=False) for year in ave['year'].values]
-
-            # create new coordinates ( space unchanged)
-            coords = {"time": dates}
-            for dim in data.coords:
-                if dim not in coords:
-                    coords[dim] = data[dim]
-            
-            # replace name: 'year' with 'time'
-            new_dims = ["time"] + [dim for dim in ave.dims if dim != "year"]
-
-            # combine all in a new array
-            ave = xr.DataArray(data=ave, dims=new_dims, coords=coords)
-
 
     elif format == 'seasons' or format in season_months:
         # Average by seasons over years        
         ave = data.groupby(['time.year', 'time.season']).mean(dim='time')
-
-        if use_cftime:
-            
-            season_times = []            
-            for (year, season), group in data.groupby(['time.year', 'time.season']):            
-                # Determine the center month of the season
-                if season in season_months:
-                    center_month = season_months[season][1]
-                else:
-                    raise ValueError(f"Unknown season: {season}")
-
-                # Create a cftime object for the center of the season
-                center_time = cftime.DatetimeGregorian(year, center_month, 15, 12, 0, 0, has_year_zero=False)
-                season_times.append(center_time)
-            
-            season_times = sorted(season_times)
-            season_times = xr.DataArray(season_times, dims=['time'], name='time', coords={'time': season_times})
-            
-            ave = ave.stack(time=("year", "season"))
-            ave = ave.drop_vars(['year','season'])
-            ave['time'] = season_times
         
         # reorder dimensions
         ave = ave.transpose(*data.dims)
@@ -342,13 +260,6 @@ def spacemean_new(data, ndim, orca="ORCA2", subset=None):
     return data.weighted(w).mean(dim=dims)
 
 
-
-#################################################################################
-# OPERATIONS WITH MEANS
-
-
-
-
 #################################################################################
 # OCEAN LAYERS
 
@@ -448,7 +359,7 @@ def cost(x, x0, metric):
         raise ValueError(f"Unknown metric: {metric}")
 
 
-def apply_cost_function(data, data_ref, metric, format='plain', format_ref='global'):
+def apply_cost_function(data, data_ref, metric):
     """
     Apply a cost function to data based on formats.
 
@@ -457,47 +368,83 @@ def apply_cost_function(data, data_ref, metric, format='plain', format_ref='glob
         data_ref (xarray.DataArray): The reference dataset.
         metric (str): The metric used to compute the cost.b
         format (str, optional): Time format of the current dataset ['plain', 'monthly', 'seasonally', 'yearly', 'global'].
-        format_ref (str, optional): Time format of the reference dataset.
-
     Returns:
         xarray.DataArray: Data containing the computed cost metrics.
     """
 
-    if format_ref == 'global': 
-        cdata = cost(data, data_ref, metric)
-
-    elif format == format_ref:
-        cdata = cost(data, data_ref, metric)
-
-    elif (format == 'monthly' and format_ref == 'seasonally'):
-        cdata = cost(data, data_ref, metric)
-
-    elif format == 'plain':
-
-        if format_ref in ['monthly', 'seasonally']:
-            n_years = int(data['time'].size/12)
-            start_year = data['time.year'][-1]
-            varname = list(data.data_vars)[0]
-            data_ref_repeated = np.tile(data_ref[varname].values, n_years)
-            data_ref_new = xr.Dataset({varname: (["time"], data_ref_repeated)}, coords={"time": data['time']})
-            cdata = cost(data, data_ref_new, metric)
-
-        elif format_ref == 'yearly':
-            if (data['time'].size/12 == data_ref['time'].size):
-                n_years = data_ref["time"].size
-                start_year = int(data_ref["time.year"][0])
-                varname = list(data.data_vars)[0]
-                data_ref_repeated = np.repeat(data_ref[varname].values, 12)
-                data_ref_new = xr.Dataset({varname: (["time"], data_ref_repeated)}, coords={"time": data['time']})
-                cdata = cost(data, data_ref_new, metric)
-            else:
-                raise ValueError("data and data_ref have different sizes.")
-        
-    else:
-        raise ValueError(f"Wrong combination of {format} and {format_ref}")
+    cdata = cost(data, data_ref, metric)
 
     return cdata
 
+
+import xarray as xr
+import numpy as np
+
+def calculate_climate_metric(x, x0, metric, mode='local', dims=('lat', 'lon')):
+    """
+    Calcola metriche climatiche con supporto per calcolo locale o aggregato.
+    
+    Args:
+        x: DataArray, campo del modello (3D: time, lat, lon).
+        x0: DataArray, campo di riferimento (2D o 3D).
+        metric: Nome della metrica ('diff', 'abserr', 'sqerr', 'reldiff', 'relabs', 'bias', 'mae', 'rmse', 'acc').
+        mode: 'local' (restituisce mappa 3D) o 'global' (restituisce scalare pesato).
+        dims: Dimensioni spaziali su cui mediare per le metriche globali.
+    """
+    
+    # 1. Definizione Operazioni Locali (Base per tutto)
+    # Usiamo una piccola costante per evitare divisioni per zero
+    eps = 1e-10
+    x0_safe = xr.where(x0 == 0, eps, x0)
+    
+    LOCAL_OPS = {
+        'diff':    x - x0,
+        'abserr':  np.abs(x - x0),
+        'sqerr':   (x - x0)**2,
+        'reldiff': (x - x0) / x0_safe,
+        'relabs':  np.abs(x - x0) / np.abs(x0_safe)
+    }
+
+    # 2. Logica per le metriche Globali (non basate su LOCAL_OPS semplici)
+    # Se la metrica richiesta è una di queste, gestiamo il calcolo pesato
+    if mode == 'global':
+        # Calcolo Pesi (cos(lat))
+        weights = np.cos(np.deg2rad(x['lat']))
+        
+        if metric == 'bias':
+            # Mean Bias Error (MBE)
+            diff = x - x0
+            return (diff * weights).sum(dim=dims) / weights.sum(dim=dims)
+        
+        elif metric == 'mae':
+            # Mean Absolute Error
+            abserr = np.abs(x - x0)
+            return (abserr * weights).sum(dim=dims) / weights.sum(dim=dims)
+        
+        elif metric == 'rmse':
+            # Root Mean Square Error
+            sqerr = (x - x0)**2
+            mse = (sqerr * weights).sum(dim=dims) / weights.sum(dim=dims)
+            return np.sqrt(mse)
+            
+        elif metric == 'acc':
+            # Anomaly Correlation Coefficient
+            x_anom = x - x.mean(dim=dims)
+            x0_anom = x0 - x0.mean(dim=dims)
+            num = (x_anom * x0_anom * weights).sum(dim=dims)
+            den = np.sqrt((x_anom**2 * weights).sum(dim=dims) * (x0_anom**2 * weights).sum(dim=dims))
+            return num / den
+
+    # 3. Logica per le metriche Locali
+    if metric in LOCAL_OPS:
+        return LOCAL_OPS[metric]
+    
+    raise ValueError(f"Metrica '{metric}' non supportata o modalità '{mode}' non valida.")
+
+
+### AGGIUNGERE KL-DIVERGENCE E SPOSTARE TUTTO IN UN ALTRO FILE, AD ES. metrics.py 
+
+################################################################################################################
 
 def year_shift(x1, y1, x2, y2, shift_threshold=20.0):
     """ 
