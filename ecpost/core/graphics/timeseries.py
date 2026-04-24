@@ -32,7 +32,7 @@ def _rescaled(vec):
     return vec/vec[0]
 
 
-def timeseries(expname, startyear, endyear, varname, format="plain", 
+def plot_timeseries(expname, startyear, endyear, varname, format="plain", 
                reader="post", orca="ORCA2", replace=False,
                rescale=False, avetype="standard", timeoff=-1990, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
@@ -116,7 +116,7 @@ def timeseries(expname, startyear, endyear, varname, format="plain",
     return pp
 
 
-def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
+def plot_timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
                          format='plain', reader="post", orca="ORCA2", replace=False, avetype="standard", timeoff=-1990, 
                          color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
@@ -215,7 +215,7 @@ def timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, e
     return pp
 
 
-def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
+def plot_timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
                               reader="nemo", replace=False, avetype="standard", timeoff=0, residue=False,
                               color=None, marker=None, label=None, ax=None, figname=None):
     """ 
@@ -329,7 +329,7 @@ def timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, startyea
     return pp
 
 
-def timeseries_with_markers(expname, startyear, endyear, varname, format="plain", 
+def plot_timeseries_with_markers(expname, startyear, endyear, varname, format="plain", 
                reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
                rescale=False, avetype="standard", timeoff=0, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
