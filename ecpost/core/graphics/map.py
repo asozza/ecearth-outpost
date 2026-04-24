@@ -3,7 +3,7 @@ import cartopy.crs as ccrs
 import cmocean
 import numpy as np
 
-def plot_nemo_map(data, lon, lat, ax=None, mask=None, 
+def plot_map(data, lon, lat, ax=None, mask=None, 
                   projection=ccrs.Robinson(),
                   title="NEMO Field", 
                   cbar_label="",
