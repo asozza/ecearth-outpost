@@ -26,7 +26,7 @@ def _rescaled(vec):
     """ rescale by the initial value """
     return vec/vec[0]
 
-def profile(expname, startyear, endyear, varname, 
+def plot_profile(expname, startyear, endyear, varname, 
             reader="post", orca="ORCA2", replace=False,
             color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
@@ -88,7 +88,7 @@ def profile(expname, startyear, endyear, varname,
 
     return pp
 
-def profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, 
+def plot_profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, 
             reader="post", orca="ORCA2", replace=False,
             color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
