@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecpost"
-dynamic = ["version"]
+version = "0.0.1"
 authors = [
   { name="Alessandro Sozza", email="asozza.ph@gmail.com" },
 ]
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["ecpost"]
+packages = ["ecpost"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
