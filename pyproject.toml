@@ -12,7 +12,7 @@ description = "ecearth-outpost; output post-processing tools for EC-Earth4"
 readme = "README.md"
 keywords = ["climate", "modeling", "diagnostics", "hpc"]
 license = {file = "LICENSE"}
-requires-python = "==3.12"
+requires-python = ">=3.12"
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",

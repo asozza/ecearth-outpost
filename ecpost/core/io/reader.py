@@ -19,6 +19,12 @@ import cftime
 from ecpost.core.utils import config
 from ecpost.core.utils import catalogue
 
+##########################################################################################
+
+def _get_nemo_timestep(filename):
+    """ Get timestep from a NEMO restart file """
+
+    return os.path.basename(filename).split('_')[1]
 
 ##########################################################################################
 # Detector of axis candidates
