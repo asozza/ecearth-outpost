@@ -24,11 +24,9 @@ dependencies = [
     "cdo"
 ]
 
-[tool.setuptools]
-packages = ["ecpost"]
-
-[tool.setuptools.dynamic]
-version = {file = "VERSION"}
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ecpost*"]
 
 [project.urls]
 "Homepage" = "https://github.com/asozza/ecearth-outpost"
