@@ -19,20 +19,18 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def get_project_root(cwd=None, project_name="ecearth-outpost"):
-    """ Get base folder of the github project """
+def get_project_root(project_name="ecearth-outpost"):
+    """ Get base folder of the github project (anchored to this file's location) """
 
-    if cwd is None:
-        cwd = os.getcwd()
-
-    parts = cwd.split(os.sep)
+    this_file = os.path.abspath(__file__)
+    parts = this_file.split(os.sep)
 
     if project_name in parts:
         idx = parts.index(project_name)
         root = os.sep.join(parts[:idx+1])
         return root
 
-    raise RuntimeError(f"Folder '{project_name}' not found in path: {cwd}")
+    raise RuntimeError(f"Folder '{project_name}' not found in path: {this_file}")
 
 
 def load_config():
