@@ -86,7 +86,7 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, mode, 
     logging.info('File to be loaded %s', filename)
     if metric != 'base' and refinfo is not None:
         data = update_description(data, refinfo)
-    data.to_netcdf(filename, mode='w', engine='netcdf4', mode='NETCDF4')
+    data.to_netcdf(filename, mode='w', engine='netcdf4', format='NETCDF4')
 
     return None
 
