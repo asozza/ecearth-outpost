@@ -77,13 +77,13 @@ def cumave(ydata):
 # space_mean:   space average
 #
 
-def timemean(data, format='global'):
+def timemean(data, mode='global'):
     """ 
     Time average of a field with various options
     
     Args:
     data (DataArray): Input field with a time dimension.
-    format (str): Type of time averaging. Options are:
+    mode (str): Type of time averaging. Options are:
                   - 'global': average over all time points.
                   - 'monthly': average by month across years.
                   - 'seasonally': average by season (DJF, MAM, JJA, SON) across years.
@@ -92,47 +92,47 @@ def timemean(data, format='global'):
                   - 'winter,spring,summer,autumn': average by a single season yearly.
 
     Returns:
-    DataArray: Time-averaged field based on the specified format.
+    DataArray: Time-averaged field based on the specified mode.
     """
 
     # Plain (leave time as is)    
-    if format == 'plain':
+    if mode == 'plain':
         ave = data
 
     # Global time average
-    elif format == 'global':
+    elif mode == 'global':
         ave = data.mean(dim='time')
 
     # Rolling average (12 months window centered)
-    elif format == 'rolling':
+    elif mode == 'rolling':
         ave = data.rolling(time=12, center=True).mean()
 
     # ISSUE: use centroids for months and seasons
-    elif format == 'monthly':       
+    elif mode == 'monthly':       
         # Average by month across years
         ave = data.groupby('time.month').mean(dim='time')
         
-    elif format == 'seasonally':
+    elif mode == 'seasonally':
         # Average by season (DJF, MAM, JJA, SON) across years
         ave = data.groupby('time.season').mean(dim='time')
 
-    elif format == 'yearly':
+    elif mode == 'yearly':
         # Average by year
         ave = data.groupby('time.year').mean(dim='time')
 
-    elif format == 'seasons' or format in season_months:
+    elif mode == 'seasons' or mode in season_months:
         # Average by seasons over years        
         ave = data.groupby(['time.year', 'time.season']).mean(dim='time')
         
         # reorder dimensions
         ave = ave.transpose(*data.dims)
 
-        if format in season_months:
+        if mode in season_months:
             # Select a specific season
-            ave = ave.sel(time=ave['time.month'].isin(season_months[format]))
+            ave = ave.sel(time=ave['time.month'].isin(season_months[mode]))
 
     else:
-        raise ValueError("""Invalid format specified. Choose between: 'plain', 'global', 'rolling', 'monthly', 'seasonally', 'yearly', 'seasons', 
+        raise ValueError("""Invalid mode specified. Choose between: 'plain', 'global', 'rolling', 'monthly', 'seasonally', 'yearly', 'seasons', 
                          or a specific season like 'winter', 'spring', 'summer', 'autumn'.""")
 
     return ave
@@ -174,7 +174,7 @@ def window_mean(ds0, window):
             centroid_num = sum(cftime.date2num(t, units="seconds since 1990-01-01", calendar=t.calendar) for t in time_values) / len(time_values)
             centroid = cftime.num2date(centroid_num, units="seconds since 1990-01-01", calendar=time_values[0].calendar)
 
-            # Use centroid as key (in cftime not string format)
+            # Use centroid as key (in cftime not string mode)
             grouped_data[centroid] = mean_value
             new_time.append(centroid)  # maintain cftime
 
@@ -358,13 +358,13 @@ def cost(x, x0, metric):
 
 def apply_cost_function(data, data_ref, metric):
     """
-    Apply a cost function to data based on formats.
+    Apply a cost function to data based on modes.
 
     Args:
         data (xarray.DataArray): The current dataset.
         data_ref (xarray.DataArray): The reference dataset.
         metric (str): The metric used to compute the cost.b
-        format (str, optional): Time format of the current dataset ['plain', 'monthly', 'seasonally', 'yearly', 'global'].
+        mode (str, optional): Time mode of the current dataset ['plain', 'monthly', 'seasonally', 'yearly', 'global'].
     Returns:
         xarray.DataArray: Data containing the computed cost metrics.
     """

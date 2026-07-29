@@ -35,7 +35,7 @@ def _rescaled(vec):
 # ISSUE: si potrebbe aggiungere un smoothing filter
 
 def plot_hovmoller(expname, startyear, endyear, varlabel, 
-               format="plain", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
+               mode="plain", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
                rescale=False, avetype="standard", timeoff=0, ax=None, figname=None):
     """ 
     Plot of Hovmöller diagram 
@@ -46,12 +46,12 @@ def plot_hovmoller(expname, startyear, endyear, varlabel,
     - varlabel: variable name + ztag
 
     Optional Args:
-    - format: time format [plain, global, yearly, monthly, seasonally, seasons, winter, sprint, summer, autumn] 
+    - mode: time mode [plain, global, yearly, monthly, seasonally, seasons, winter, sprint, summer, autumn] 
     - reader: read the original raw data or averaged data ['nemo', 'post']
     - orca: ORCA configuration [ORCA2, eORCA1 ...]    
     - replace: replace existing files [False or True]
     - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
-    - refinfo: reference state information {expname, startyear, endyear, diagname, format}
+    - refinfo: reference state inmodeion {expname, startyear, endyear, diagname, mode}
 
     Optional Args for figure settings:
     - rescale: rescale by initial value
@@ -73,27 +73,27 @@ def plot_hovmoller(expname, startyear, endyear, varlabel,
     if reader == "nemo":
 
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varlabel=varlabel, diagname='hovmoller', format=format, orca=orca)
+        data = averaging(data=data, varlabel=varlabel, diagname='hovmoller', mode=mode, orca=orca)
         tvec = get_decimal_year(data['time'].values)
 
         # apply cost function
         if metric != 'base':
 
             xdata = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
-            xdata = averaging(data=xdata, varlabel=varlabel, diagname=refinfo['diagname'], format=refinfo['format'], orca=orca)            
+            xdata = averaging(data=xdata, varlabel=varlabel, diagname=refinfo['diagname'], mode=refinfo['mode'], orca=orca)            
 
             if refinfo['diagname'] == 'field':
-                data = apply_cost_function(data, xdata, metric, format=format, format_ref=refinfo['format'])    
-                data = averaging(data=data, varlabel=varlabel, diagname='timeseries', format=format, orca=orca)
+                data = apply_cost_function(data, xdata, metric, mode=mode, mode_ref=refinfo['mode'])    
+                data = averaging(data=data, varlabel=varlabel, diagname='timeseries', mode=mode, orca=orca)
             else:
-                data = apply_cost_function(data, xdata, metric, format=format, format_ref=refinfo['format'])
+                data = apply_cost_function(data, xdata, metric, mode=mode, mode_ref=refinfo['mode'])
 
 
     # Read post-processed data
     elif reader == "post":
 
         data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varlabel, 
-                               diagname='hovmoller', format=format, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+                               diagname='hovmoller', mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
         data = data[varname]
         #tvec = get_decimal_year(data['time'].values)
 
