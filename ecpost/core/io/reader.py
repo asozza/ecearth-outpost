@@ -10,11 +10,9 @@ Date: Nov 2025
 
 import os
 import glob
-import shutil
-import subprocess
 import logging
 import xarray as xr
-import cftime
+
 
 from ecpost.core.utils import config
 from ecpost.core.utils import catalogue

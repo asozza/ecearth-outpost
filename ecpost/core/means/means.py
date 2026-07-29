@@ -8,9 +8,7 @@ Author: Alessandro Sozza (CNR-ISAC)
 Date: Mar 2024
 """
 
-from typing import Any
 import numpy as np
-import logging
 import xarray as xr
 import cftime
 
@@ -439,6 +437,30 @@ def calculate_climate_metric(x, x0, metric, mode='local', dims=('lat', 'lon')):
         return LOCAL_OPS[metric]
     
     raise ValueError(f"Metrica '{metric}' non supportata o modalità '{mode}' non valida.")
+
+
+def climate_metric(data, reference, metric="sqerr"):
+
+    """
+    Compute climate metrics between a model field and a reference field.
+
+    Args:
+        data (xarray.DataArray): Model field (3D: time, lat, lon).
+        reference (xarray.DataArray): Reference field (2D or 3D).
+        metric (str): Metric to compute. Options include:
+                      'diff', 'abserr', 'sqerr', 'reldiff', 'relabs', 
+                      'bias', 'mae', 'rmse', 'acc'.
+    """
+
+    # Determine if the metric is local or global
+    METRICS = ['sqerr', "abserr"]
+    if metric not in METRICS:
+        raise ValueError(f"Unknown metric: {metric}. Choose from {METRICS}.")
+
+    if metric == 'sqerr':
+        return (data - reference) ** 2
+    if metric == 'abserr':
+        return np.abs(data - reference)
 
 
 ### AGGIUNGERE KL-DIVERGENCE E SPOSTARE TUTTO IN UN ALTRO FILE, AD ES. metrics.py 
