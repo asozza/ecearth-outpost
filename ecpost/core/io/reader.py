@@ -85,7 +85,7 @@ def _nemodict(grid, freq):
 
     grid = grid.upper().strip()
     grid_lower = grid.lower()
-
+    
     if grid in ["T", "U", "V"]:
         return {
             grid: {
@@ -101,7 +101,6 @@ def _nemodict(grid, freq):
             }
         }
     elif grid == "W":
-        grid_lower = grid.lower()
         return {
             "W": {
                 "preproc": preproc_nemo,
@@ -111,7 +110,7 @@ def _nemodict(grid, freq):
                 "depth": [f"depth{grid_lower}", "z"]
             }
         }
-    elif grid == "ice":
+    elif grid_lower == "ice":
         return {
             "ice": {
                 "preproc": preproc_nemo_ice,
