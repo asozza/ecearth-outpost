@@ -13,11 +13,7 @@ import yaml
 import logging
 import platform
 
-logging.basicConfig(
-    #filename='logfile.log',
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s')
-
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_project_root(project_name="ecearth-outpost"):
     """ Get base folder of the github project (anchored to this file's location) """
