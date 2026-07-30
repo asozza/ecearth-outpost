@@ -14,8 +14,10 @@ import logging
 import xarray as xr
 
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 from ecpost.core.utils import catalogue
+
+cfg = Config()
 
 ##########################################################################################
 
@@ -183,7 +185,7 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
 
     """
 
-    dirs = config.folders(expname)
+    dirs = cfg.folders(expname)
     dict = _nemodict(grid, freq)
 
     filelist = []

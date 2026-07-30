@@ -10,12 +10,11 @@ Date: Nov 2025
 
 import os
 import re
-import shutil
 import logging
 import numpy as np
 import xarray as xr
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 from ecpost.core.utils import catalogue   
 from ecpost.core.io.reader import reader_nemo_field
 from ecpost.core.means.means import apply_cost_function, spacemean, timemean
@@ -31,6 +30,7 @@ MERGE_RULES = {
     "section": "mean",
     "field": "mean"
 }
+
 
 ##########################################################################################
 # I/O for averaged data
@@ -58,7 +58,8 @@ def reader_averaged(expname, startyear, endyear, varname, diagname, mode, metric
     
     """
 
-    dirs = config.folders(expname)
+    cfg = Config()
+    dirs = cfg.folders(expname)
     filename = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, mode, metric)
     logging.info('File to be loaded %s', filename)
     data = xr.open_dataset(filename, use_cftime=True)
@@ -81,7 +82,8 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, mode, 
         refinfo: reference info
     """
 
-    dirs = config.folders(expname)
+    cfg = Config()
+    dirs = cfg.folders(expname)
     filename = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, mode, metric)
     logging.info('File to be loaded %s', filename)
     if metric != 'base' and refinfo is not None:
@@ -112,7 +114,9 @@ def find_existing_merged(expname, varname, diagname, mode, metric='base'):
       - partial : partially overlapping with the longest
       - disjoint : no overlap with the longest
     """
-    dirs = config.folders(expname)
+
+    cfg = Config()
+    dirs = cfg.folders(expname)
     postdir = dirs['post']
 
     # Determina il suffisso da aggiungere solo se metric è diverso da 'base'
@@ -228,7 +232,9 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, mode, met
     Merge single-year files and usable merged blocks into a single dataset.
     Ensures no overlapping time coordinates and chronological order.
     """
-    dirs = config.folders(expname)
+
+    cfg = Config()
+    dirs = cfg.folders(expname)
     postdir = dirs['post']
 
     # 1) Find existing merged files
@@ -329,7 +335,9 @@ def clean_merged_files(expname, varname, diagname, mode, metric='base', dry_run=
       - identifies fully contained merged files for deletion
       - optionally deletes them if dry_run=False
     """
-    dirs = config.folders(expname)
+
+    cfg = Config()
+    dirs = cfg.folders(expname)
 
     longest, contained, partial, disjoint = find_existing_merged(expname, varname, diagname, mode, metric)
 
@@ -377,7 +385,9 @@ def clean_annual_files(expname, startyear, endyear, varname, diagname, mode, met
         mode (str): Time mode.
         dry_run (bool): If True, only log files without deleting.
     """
-    dirs = config.folders(expname)
+
+    cfg = Config()
+    dirs = cfg.folders(expname)
 
     logging.info(f"{'Dry run: would delete' if dry_run else 'Deleting'} single-year files for {varname} {startyear}-{endyear}:")
 
@@ -465,7 +475,8 @@ def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=
 
     """
 
-    dirs = config.folders(expname)
+    cfg = Config()
+    dirs = cfg.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
     #################################
@@ -556,7 +567,8 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, mode='global
     
     """
 
-    dirs = config.folders(expname)
+    cfg = Config()
+    dirs = cfg.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
     ds_ref = None    

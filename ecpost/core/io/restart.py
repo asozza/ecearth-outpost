@@ -15,7 +15,9 @@ import logging
 import netCDF4 as nc
 import xarray as xr
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
+
+cfg = Config()
 
 ##########################################################################################
 
@@ -49,7 +51,7 @@ def reader_nemo_restart(expname, leg):
     leg: time leg
     """
 
-    dirs = config.folders(expname)
+    dirs = cfg.folders(expname)
     
     flist = glob.glob(os.path.join(dirs['restart'], str(leg).zfill(3), expname + '*_' + 'restart' + '_????.nc'))        
     tstep = _get_nemo_timestep(flist[0])
@@ -74,7 +76,7 @@ def writer_nemo_restart(data, expname, leg):
     leg: time leg
     """
 
-    dirs = config.folders(expname)
+    dirs = cfg.folders(expname)
     flist = glob.glob(os.path.join(dirs['restart'], str(leg).zfill(3), expname + '*_' + 'restart' + '_????.nc'))
     timestep = _get_nemo_timestep(flist[0])
 
@@ -104,7 +106,7 @@ def update_nemo_restart(expname, leg, use_symlinks=False):
                              If False, copies them directly to the run folder.
     """
     
-    dirs = config.folders(expname)
+    dirs = cfg.folders(expname)
     
     # Paths definition
     run_dir = dirs['exp']
@@ -155,7 +157,7 @@ def update_nemo_restart(expname, leg, use_symlinks=False):
 def restore_nemo_restart(expname, leg):
     """ Restore original nemo restart files """
 
-    dirs = config.folders(expname)
+    dirs = cfg.folders(expname)
 
     # copying from the restart folder required for the leg you asked
     browser = ['*restart*']
