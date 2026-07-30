@@ -15,7 +15,7 @@ import yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-CONFIG_FILENAME = "workspace-config.yml"
+CONFIG_FILENAME = "config.yml"
 REQUIRED_KEYS = ("base_path", "src_path", "data_path")
 
 
@@ -27,7 +27,7 @@ class Config:
     """ Carica un workspace-config.yml e fornisce i path di un esperimento. """
 
     def __init__(self, config_path=None):
-        self.config_path = Path(config_path) if config_path else self._find_config_file()
+        self.config_path = config_path #if config_path else self._find_config_file()
         self.base_path = None
         self.src_path = None
         self.data_path = None
