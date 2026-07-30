@@ -14,7 +14,7 @@ import numpy as np
 import datetime
 import time
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 
 def get_epoch(date):
     """ Get epoch from date """
@@ -62,9 +62,10 @@ def count_total_steps(start_year, end_year, steps_per_day):
 
     return total_steps
 
-def read_legfile(expname):
+def read_legfile(expname, config_path=None):
     """ Read date & leg from legfile """
 
+    config = Config(config_path)
     dirs = config.folders(expname)
     legfile = os.path.join(dirs['exp'], 'leginfo.yml')
     with open(legfile, 'r', encoding='utf-8') as file:
