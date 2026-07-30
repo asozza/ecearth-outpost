@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Folder definitions
+
+Author: Alessandro Sozza (CNR-ISAC)
+Date: July 2026
+"""
+
 import os
 import logging
 from pathlib import Path
