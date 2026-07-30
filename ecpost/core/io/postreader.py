@@ -44,7 +44,7 @@ def get_output_path(postdir, expname, startyear, endyear, varname, diagname, mod
     return os.path.join(postdir, filename)
 
 
-def reader_averaged(expname, startyear, endyear, varname, diagname, mode, metric='base'):
+def reader_averaged(expname, startyear, endyear, varname, diagname, mode, metric='base', config_path=None):
     """ 
     Reader of averaged data 
     
@@ -58,8 +58,10 @@ def reader_averaged(expname, startyear, endyear, varname, diagname, mode, metric
     
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
+
     filename = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, mode, metric)
     logging.info('File to be loaded %s', filename)
     data = xr.open_dataset(filename, use_cftime=True)
@@ -67,7 +69,7 @@ def reader_averaged(expname, startyear, endyear, varname, diagname, mode, metric
     return data
 
 
-def writer_averaged(data, expname, startyear, endyear, varname, diagname, mode, metric='base', refinfo=None):
+def writer_averaged(data, expname, startyear, endyear, varname, diagname, mode, metric='base', refinfo=None, config_path=None):
     """ 
     Writer of averaged data 
     
@@ -82,8 +84,10 @@ def writer_averaged(data, expname, startyear, endyear, varname, diagname, mode, 
         refinfo: reference info
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
+
     filename = get_output_path(dirs['post'], expname, startyear, endyear, varname, diagname, mode, metric)
     logging.info('File to be loaded %s', filename)
     if metric != 'base' and refinfo is not None:
@@ -105,7 +109,7 @@ def update_description(data, refinfo):
 ##########################################################################################
 # merging functions for timeseries
 
-def find_existing_merged(expname, varname, diagname, mode, metric='base'):
+def find_existing_merged(expname, varname, diagname, mode, metric='base', config_path=None):
     """
     Scan the post directory for merged files of a given variable,
     classify them into:
@@ -115,7 +119,8 @@ def find_existing_merged(expname, varname, diagname, mode, metric='base'):
       - disjoint : no overlap with the longest
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     postdir = dirs['post']
 
@@ -227,13 +232,14 @@ def parse_years_from_filename(fname):
     return y0, y1, y1 - y0 + 1
 
 
-def merge_annual_files(expname, startyear, endyear, varname, diagname, mode, metric='base'):
+def merge_annual_files(expname, startyear, endyear, varname, diagname, mode, metric='base', config_path=None):
     """
     Merge single-year files and usable merged blocks into a single dataset.
     Ensures no overlapping time coordinates and chronological order.
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     postdir = dirs['post']
 
@@ -328,7 +334,7 @@ def merge_annual_files(expname, startyear, endyear, varname, diagname, mode, met
     return ds_out
 
 
-def clean_merged_files(expname, varname, diagname, mode, metric='base', dry_run=True):
+def clean_merged_files(expname, varname, diagname, mode, metric='base', dry_run=True, config_path=None):
     """
     Clean up redundant merged files:
       - keeps the longest merged
@@ -336,7 +342,8 @@ def clean_merged_files(expname, varname, diagname, mode, metric='base', dry_run=
       - optionally deletes them if dry_run=False
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
 
     longest, contained, partial, disjoint = find_existing_merged(expname, varname, diagname, mode, metric)
@@ -372,7 +379,7 @@ def clean_merged_files(expname, varname, diagname, mode, metric='base', dry_run=
     return summary
 
 
-def clean_annual_files(expname, startyear, endyear, varname, diagname, mode, metric='base', dry_run=True):
+def clean_annual_files(expname, startyear, endyear, varname, diagname, mode, metric='base', dry_run=True, config_path=None):
     """
     Delete single-year files for a given variable and experiment.
 
@@ -386,7 +393,8 @@ def clean_annual_files(expname, startyear, endyear, varname, diagname, mode, met
         dry_run (bool): If True, only log files without deleting.
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
 
     logging.info(f"{'Dry run: would delete' if dry_run else 'Deleting'} single-year files for {varname} {startyear}-{endyear}:")
@@ -461,7 +469,7 @@ def averaging(data, varname, diagname, mode, orca):
 
 
 ######################################################################################################
-def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=False, cleanup=False):
+def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=False, cleanup=False, config_path=None):
     """ 
     Get climatological reference field.
 
@@ -475,7 +483,8 @@ def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=
 
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     info = catalogue.observables('nemo')[varname]
     
@@ -550,7 +559,7 @@ def get_climatology(expname, startyear, endyear, varname, orca='ORCA2', replace=
 ##############################################################################################################################################################
 ##############################################################################################################################################################
 # MAIN FUNCTION
-def postreader_nemo(expname, startyear, endyear, varname, diagname, mode='global', metric='base', refinfo=None, orca='ORCA2', replace=False, cleanup=False):
+def postreader_nemo(expname, startyear, endyear, varname, diagname, mode='global', metric='base', refinfo=None, orca='ORCA2', replace=False, cleanup=False, config_path=None):
     """ 
     Postreader_nemo: main function for reading averaged data
     
@@ -567,7 +576,8 @@ def postreader_nemo(expname, startyear, endyear, varname, diagname, mode='global
     
     """
 
-    cfg = Config()
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     info = catalogue.observables('nemo')[varname]
     

@@ -17,8 +17,6 @@ import xarray as xr
 from ecpost.core.utils.config import Config
 from ecpost.core.utils import catalogue
 
-cfg = Config()
-
 ##########################################################################################
 
 def _get_nemo_timestep(filename):
@@ -173,7 +171,7 @@ def preproc_nemo_ice(data):
     return data
 
 
-def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
+def reader_nemo(expname, startyear, endyear, grid="T", freq="1m", config_path=None):
     """ 
     reader_nemo: function to read NEMO data 
     
@@ -185,7 +183,11 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
 
     """
 
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
+
+    # dictionary of NEMO output features
     dict = _nemodict(grid, freq)
 
     filelist = []
@@ -218,7 +220,7 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
     return data
 
 
-def reader_nemo_field(expname, startyear, endyear, varname, freq="1m"):
+def reader_nemo_field(expname, startyear, endyear, varname, freq="1m", config_path=None):
     """ 
     reader_nemo_field: function to read NEMO field 
     
@@ -235,13 +237,13 @@ def reader_nemo_field(expname, startyear, endyear, varname, freq="1m"):
     if 'dependencies' in info: 
         field = {}
         for grid, var in zip(info['grid'], info['dependencies']):
-            data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=grid)
+            data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=grid, config_path=config_path)
             field[var] = data[var]
             if 'preprocessing' in info and var in info['preprocessing']:
                 field[var] = info['preprocessing'][var](field[var])
         data = info['operation'](*[field[var] for var in info['dependencies']])
     else:
-        data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=info['grid'], freq=freq)
+        data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=info['grid'], freq=freq, config_path=config_path)
         data = data[[varname]]
 
     return data

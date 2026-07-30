@@ -24,10 +24,11 @@ class ConfigError(RuntimeError):
 
 
 class Config:
-    """ Carica un workspace-config.yml e fornisce i path di un esperimento. """
+    """ Carica un config.yml e fornisce i path di un esperimento. """
 
     def __init__(self, config_path=None):
-        self.config_path = config_path #if config_path else self._find_config_file()
+        # Convertiamo sempre in Path se viene passata una stringa
+        self.config_path = Path(config_path) if config_path else self._find_config_file()
         self.base_path = None
         self.src_path = None
         self.data_path = None
@@ -53,35 +54,40 @@ class Config:
         if not self.config_path.is_file():
             raise ConfigError(f"Config non trovata: {self.config_path}")
 
-        with open(self.config_path, "r") as f:
+        with open(self.config_path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
 
         missing = [k for k in REQUIRED_KEYS if not raw.get(k)]
         if missing:
             raise ConfigError(f"Campi mancanti o vuoti in {self.config_path}: {missing}")
 
-        self.base_path = raw["base_path"]
-        self.src_path = raw["src_path"]
-        self.data_path = raw["data_path"]
+        # Convertiamo anche questi in Path per coerenza con pathlib
+        self.base_path = Path(raw["base_path"])
+        self.src_path = Path(raw["src_path"])
+        self.data_path = Path(raw["data_path"])
 
     def folders(self, expname):
-        if expname == "":
+        if not expname:  # Gestisce sia "" che None
             return {
-                'rebuild': os.path.join(self.src_path, "rebuild_nemo"),
-                'domain': os.path.join(self.data_path, "nemo", "domain"),
+                'rebuild': str(self.src_path / "rebuild_nemo"),
+                'domain': str(self.data_path / "nemo" / "domain"),
             }
 
+        exp_base = self.base_path / expname
         dirs = {
-            'exp': os.path.join(self.base_path, expname),
-            'nemo': os.path.join(self.base_path, expname, "output", "nemo"),
-            'oifs': os.path.join(self.base_path, expname, "output", "oifs"),
-            'restart': os.path.join(self.base_path, expname, "restart"),
-            'log': os.path.join(self.base_path, expname, "log"),
-            'tmp': os.path.join(self.base_path, expname, "tmp"),
-            'post': os.path.join(self.base_path, expname, "post"),
-            'rebuild': os.path.join(self.src_path, "rebuild_nemo"),
-            'domain': os.path.join(self.data_path, "nemo", "domain"),
+            'exp': str(exp_base),
+            'nemo': str(exp_base / "output" / "nemo"),
+            'oifs': str(exp_base / "output" / "oifs"),
+            'restart': str(exp_base / "restart"),
+            'log': str(exp_base / "log"),
+            'tmp': str(exp_base / "tmp"),
+            'post': str(exp_base / "post"),
+            'rebuild': str(self.src_path / "rebuild_nemo"),
+            'domain': str(self.data_path / "nemo" / "domain"),
         }
-        os.makedirs(dirs['post'], exist_ok=True)
-        os.makedirs(dirs['tmp'], exist_ok=True)
+        
+        # Creazione cartelle in modo sicuro
+        Path(dirs['post']).mkdir(parents=True, exist_ok=True)
+        Path(dirs['tmp']).mkdir(parents=True, exist_ok=True)
+        
         return dirs

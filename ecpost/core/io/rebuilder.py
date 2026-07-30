@@ -14,8 +14,6 @@ import subprocess
 
 from ecpost.core.utils.config import Config
 
-cfg = Config()
-
 def _get_nemo_timestep(filename):
     """ Get timestep from a NEMO restart file """
 
@@ -23,9 +21,11 @@ def _get_nemo_timestep(filename):
 
 ##########################################################################################
 
-def rebuild_nemo_restart(expname, leg):
+def rebuild_nemo_restart(expname, leg, config_path=None):
     """Function to rebuild NEMO restart """
 
+    # configure folders
+    cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     
     os.makedirs(os.path.join(dirs['tmp'], str(leg).zfill(3)), exist_ok=True)
