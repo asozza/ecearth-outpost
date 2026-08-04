@@ -204,7 +204,7 @@ class NemoReader:
 
         """
 
-        logging.info(f"Loading experiment {expname}, grid {grid}, ({startyear}-{endyear})")
+        logging.info(f"Loading experiment: {expname}, grid: {grid}, range: ({startyear}-{endyear})")
 
         # load folders
         dirs = self.config.folders(expname)
@@ -254,7 +254,7 @@ class NemoReader:
 
         """
 
-        logging.info(f"Reading NEMO field {varname}")
+        logging.info(f"Reading NEMO field: {varname}")
 
         info = catalogue.observables('nemo')[varname]
 
