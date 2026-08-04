@@ -92,7 +92,23 @@ def observables(component):
                 'emix_iwm': {'dim': '3D', 'grid': 'W', 'units': 'W/kg', 'long_name': 'Power density available for mixing'},
                 'av_ratio': {'dim': '3D', 'grid': 'W', 'units': '-', 'long_name': 'Diffusivity ratio'}, # S over T
 
-                # ice
+                # Ice grid (SI3 / NEMO-ICE)
+                # Integrated / 2D variables
+                'siconc': {'dim': '2D', 'grid': 'ice', 'units': '1', 'long_name': 'Sea ice area fraction'},
+                'sithic': {'dim': '2D', 'grid': 'ice', 'units': 'm', 'long_name': 'Sea ice thickness'},
+                'sivolu': {'dim': '2D', 'grid': 'ice', 'units': 'm', 'long_name': 'Sea ice volume per unit area'},
+                'snthic': {'dim': '2D', 'grid': 'ice', 'units': 'm', 'long_name': 'Snow thickness'},
+                'snvolu': {'dim': '2D', 'grid': 'ice', 'units': 'm', 'long_name': 'Snow volume per unit area'},
+                'sistem': {'dim': '2D', 'grid': 'ice', 'units': 'K', 'long_name': 'Sea ice surface temperature'},
+                'sialbi': {'dim': '2D', 'grid': 'ice', 'units': '1', 'long_name': 'Sea ice albedo'},
+
+                # Category-disaggregated variables (3D: time x y + ncatice)
+                'si_cat': {'dim': '3D', 'grid': 'ice', 'units': '1', 'long_name': 'Sea ice concentration by category'},
+                'hi_cat': {'dim': '3D', 'grid': 'ice', 'units': 'm', 'long_name': 'Sea ice thickness by category'},
+                'hs_cat': {'dim': '3D', 'grid': 'ice', 'units': 'm', 'long_name': 'Snow thickness by category'},
+                'v_i_cat': {'dim': '3D', 'grid': 'ice', 'units': 'm', 'long_name': 'Sea ice volume by category'},
+                'v_s_cat': {'dim': '3D', 'grid': 'ice', 'units': 'm', 'long_name': 'Snow volume by category'},
+                't_s_cat': {'dim': '3D', 'grid': 'ice', 'units': 'K', 'long_name': 'Snow surface temperature by category'},
 
                 # diaptr3d (zonal averages by basins)
                 'msftyz': {'dim': '2D', 'grid': 'W', 'long_name': 'Overturning Stream-Function', 'units': 'Sv'},
@@ -265,38 +281,39 @@ def observables(component):
     return varlist
 
 
-
 def coordinates(component):
     """ Dictionary of coordinates in EC-Earth """
-
     if component == 'nemo':
-        coordlist = {        
-            "time": {"axis": "T", 
-                     "standard_name": "time", 
-                     "long_name": "time", 
-                     "calendar": "gregorian", 
-                     "units": "seconds since 1990-01-01 00:00:00", 
-                     "time_origin": "1990-01-01 00:00:00"},
-            "month": {"standard_name": "month",
-                     "long_name": "month",                 
-                     "units": "months"},
-            "season": {"standard_name": "season",
-                     "long_name": "season",                 
-                     "units": "seasons"},
-            "year": {"standard_name": "year",
-                     "long_name": "year",                 
-                     "units": "years",
-                     "origin": "1990"},
-            "lat": {"standard_name": "latitude",
-                    "long_name": "latitude",
-                    "units": "deg"},
-            "lon": {"standard_name": "longitude",
-                    "long_name": "longitude",
-                    "units": "deg"},
-            "z": {"standard_name": "depth",
-                  "long_name": "depth",
-                  "units": "m",
-                  "positive": "up"}
+        coordlist = {
+                "time": {"axis": "T", 
+                        "standard_name": "time", 
+                        "long_name": "time", 
+                        "calendar": "gregorian", 
+                        "units": "seconds since 1990-01-01 00:00:00", 
+                        "time_origin": "1990-01-01 00:00:00"},
+                "month": {"standard_name": "month",
+                        "long_name": "month",                 
+                        "units": "months"},
+                "season": {"standard_name": "season",
+                        "long_name": "season",                 
+                        "units": "seasons"},
+                "year": {"standard_name": "year",
+                        "long_name": "year",                 
+                        "units": "years",
+                        "origin": "1990"},
+                "lat": {"standard_name": "latitude",
+                        "long_name": "latitude",
+                        "units": "deg"},
+                "lon": {"standard_name": "longitude",
+                        "long_name": "longitude",
+                        "units": "deg"},
+                "z": {"standard_name": "depth",
+                        "long_name": "depth",
+                        "units": "m",
+                        "positive": "up"},
+                "ncatice": {"standard_name": "Ice category",
+                        "long_name": "Ice category",
+                        "units": "1"}
         }
 
     return coordlist
@@ -304,6 +321,7 @@ def coordinates(component):
 
 def axis_candidates(component):
     """ Returns candidate variable/dimension names for axis detection """
+
     if component == 'nemo':
         return {
             'time': ['time_counter', 'time', 't'],
@@ -311,6 +329,8 @@ def axis_candidates(component):
             'y': ['y', 'y_grid_T', 'y_grid_T_inner', 'y_grid_U', 'y_grid_V', 'y_grid_W', 'lat', 'latitude', 'nav_lat'],
             'z': ['deptht', 'depthu', 'depthv', 'depthw', 'depth', 'z', 'lev', 'nav_lev'],
             'lon': ['nav_lon_grid_T', 'nav_lon'],
-            'lat': ['nav_lat_grid_T', 'nav_lat']
+            'lat': ['nav_lat_grid_T', 'nav_lat'],
+            'ncatice': ['ncatice', 'ncat', 'catice', 'ice_cat']
         }
+
     return {}
