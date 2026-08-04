@@ -301,3 +301,16 @@ def coordinates(component):
 
     return coordlist
 
+
+def axis_candidates(component):
+    """ Returns candidate variable/dimension names for axis detection """
+    if component == 'nemo':
+        return {
+            'time': ['time_counter', 'time', 't'],
+            'x': ['x', 'x_grid_T', 'x_grid_T_inner', 'x_grid_U', 'x_grid_V', 'x_grid_W', 'lon', 'longitude', 'nav_lon'],
+            'y': ['y', 'y_grid_T', 'y_grid_T_inner', 'y_grid_U', 'y_grid_V', 'y_grid_W', 'lat', 'latitude', 'nav_lat'],
+            'z': ['deptht', 'depthu', 'depthv', 'depthw', 'depth', 'z', 'lev', 'nav_lev'],
+            'lon': ['nav_lon_grid_T', 'nav_lon'],
+            'lat': ['nav_lat_grid_T', 'nav_lat']
+        }
+    return {}
