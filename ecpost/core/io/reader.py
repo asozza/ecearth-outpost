@@ -13,16 +13,8 @@ import glob
 import logging
 import xarray as xr
 
-
 from ecpost.core.utils.config import Config
 from ecpost.core.utils import catalogue
-
-##########################################################################################
-
-def _get_nemo_timestep(filename):
-    """ Get timestep from a NEMO restart file """
-
-    return os.path.basename(filename).split('_')[1]
 
 ##########################################################################################
 # Detector of axis candidates
