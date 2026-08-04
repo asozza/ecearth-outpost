@@ -28,7 +28,7 @@ def rebuild_nemo_restart(expname, leg, config_path=None):
     cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     
-    os.makedirs(os.path.join(dirs['tmp'], str(leg).zfill(3)), exist_ok=True)
+    os.makedirs(os.path.join(dirs['saveic'], str(leg).zfill(3)), 'nemo', exist_ok=True)
 
     rebuild_exe = os.path.join(dirs['rebuild'], "rebuild_nemo")
   
@@ -38,13 +38,13 @@ def rebuild_nemo_restart(expname, leg, config_path=None):
         tstep = _get_nemo_timestep(flist[0])
 
         for filename in flist:
-            destination_path = os.path.join(dirs['tmp'], str(leg).zfill(3), os.path.basename(filename))
+            destination_path = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', os.path.basename(filename))
             try:
                 os.symlink(filename, destination_path)
             except FileExistsError:
                 pass
 
-        rebuild_command = [rebuild_exe, "-m", os.path.join(dirs['tmp'], str(leg).zfill(3), expname + "_" + tstep + "_" + kind ), str(len(flist))]
+        rebuild_command = [rebuild_exe, "-m", os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + "_" + tstep + "_" + kind ), str(len(flist))]
         try:
             print(rebuild_command)
             subprocess.run(rebuild_command, stderr=subprocess.PIPE, text=True, check=True)
@@ -55,13 +55,8 @@ def rebuild_nemo_restart(expname, leg, config_path=None):
             print(error_message)
 
         for filename in flist:
-            destination_path = os.path.join(dirs['tmp'], str(leg).zfill(3), os.path.basename(filename))
+            destination_path = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', os.path.basename(filename))
             os.remove(destination_path)
-
-    # copy restart
-    #tstep = _get_nemo_timestep(glob.glob(os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '*_restart.nc'))[0])
-    #shutil.copy(os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + tstep + '_restart.nc'), os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart.nc'))
-    #shutil.copy(os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + tstep + '_restart_ice.nc'), os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart_ice.nc'))
 
     # delete temporary files
     flist = glob.glob('nam_rebuild*')
