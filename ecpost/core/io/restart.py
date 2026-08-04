@@ -57,7 +57,7 @@ def reader_nemo_restart(expname, leg, config_path=None):
     tstep = _get_nemo_timestep(flist[0])
 
     try:
-        filename = os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + tstep + '_restart.nc')
+        filename = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + '_' + tstep + '_restart.nc')
         time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
         data = xr.open_mfdataset(filename, decode_times=time_coder)
         return data
@@ -84,15 +84,15 @@ def writer_nemo_restart(data, expname, leg, config_path=None):
     timestep = _get_nemo_timestep(flist[0])
 
     # ocean restart creation
-    filename = os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart.nc')
+    filename = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', 'restart.nc')
     data.to_netcdf(filename, mode='w', unlimited_dims={'time_counter': True})
 
     # delete attributes
     _delete_attrs(filename)
 
     # copy ice restart
-    inifile = os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + timestep + '_restart_ice.nc')
-    outfile = os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart_ice.nc')
+    inifile = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + '_' + timestep + '_restart_ice.nc')
+    outfile = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', 'restart_ice.nc')
     shutil.copy(inifile, outfile)
 
     return None
@@ -112,12 +112,7 @@ def update_nemo_restart(expname, leg, config_path=None, use_symlinks=False):
     # configure folders
     cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
-    
-    # Paths definition
-    run_dir = dirs['exp']
-    restart_store = dirs['restart']
-    temp_dir = dirs['tmp']
-    
+        
     # Format leg number (e.g., 1 -> '001')
     leg_id = str(leg).zfill(3)
     restart_files = ['restart.nc', 'restart_ice.nc']
@@ -133,7 +128,7 @@ def update_nemo_restart(expname, leg, config_path=None, use_symlinks=False):
     # 2. Deliver new files
     for filename in restart_files:
         # Define source and destination paths
-        source_temp = os.path.join(dirs['tmp'], leg_id, filename)
+        source_temp = os.path.join(dirs['saveic'], leg_id, 'nemo', filename)
         target_archive = os.path.join(dirs['restart'], leg_id, filename)
         run_destination = os.path.join(dirs['exp'], filename)
 
