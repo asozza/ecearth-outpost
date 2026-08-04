@@ -20,6 +20,7 @@ import datetime
 import os
 import xarray as xr
 
+from ecpost.core.utils.config import Config
 from ecpost.core.io.postreader import get_climatology
 
 def parse_args():
@@ -32,6 +33,7 @@ def parse_args():
     parser.add_argument("endyear", metavar="ENDYEAR", help="Ending year", type=int)
     parser.add_argument("window", metavar="WINDOW", help="EOF window", type=int)
     parser.add_argument("years_to_skip", metavar="YEARS_TO_SKIP", help="Years to skip", type=int)
+    parser.add_argument("config_file", metavar="CONFIG_FILE", help="Configuration file", type=str)
 
     # optional to activate nemo rebuild
     parser.add_argument("--rebuild", action="store_true", help="Enable nemo-rebuild")
@@ -53,8 +55,10 @@ if __name__ == "__main__":
     endyear = args.endyear
     window = args.window
     years_to_skip = args.years_to_skip
+    config_file = args.config_file
 
     # define folders
+    config = Config(args.config_file)
     dirs = config.folders(expname)
 
     get_climatology(expname='cs00', startyear=6069, endyear=6999, varname='thetao')
