@@ -9,11 +9,12 @@ Date: July 2026
 """
 
 import os
+import yaml
 import logging
 from pathlib import Path
-import yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 CONFIG_FILENAME = "config.yml"
 REQUIRED_KEYS = ("base_path", "src_path", "data_path")
@@ -80,7 +81,7 @@ class Config:
             'oifs': str(exp_base / "output" / "oifs"),
             'restart': str(exp_base / "restart"),
             'log': str(exp_base / "log"),
-            'tmp': str(exp_base / "tmp"),
+            'saveic': str(exp_base / "saveic"),
             'post': str(exp_base / "post"),
             'rebuild': str(self.src_path / "rebuild_nemo"),
             'domain': str(self.data_path / "nemo" / "domain"),
@@ -88,6 +89,6 @@ class Config:
         
         # Creazione cartelle in modo sicuro
         Path(dirs['post']).mkdir(parents=True, exist_ok=True)
-        Path(dirs['tmp']).mkdir(parents=True, exist_ok=True)
+        Path(dirs['saveic']).mkdir(parents=True, exist_ok=True)
         
         return dirs
