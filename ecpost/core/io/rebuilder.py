@@ -28,7 +28,7 @@ def rebuild_nemo_restart(expname, leg, config_path=None):
     cfg = Config(config_path=config_path)
     dirs = cfg.folders(expname)
     
-    os.makedirs(os.path.join(dirs['saveic'], str(leg).zfill(3)), 'nemo', exist_ok=True)
+    os.makedirs(os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo'), exist_ok=True)
 
     rebuild_exe = os.path.join(dirs['rebuild'], "rebuild_nemo")
   
