@@ -23,52 +23,55 @@ REQUIRED_KEYS = ("base_path", "src_path", "data_path")
 class ConfigError(RuntimeError):
     pass
 
+CONFIG_FILENAME = "config.yml"
+DEFAULT_CONFIG = Path(__file__).resolve().parent / CONFIG_FILENAME
+REQUIRED_KEYS = ("base_path", "src_path", "data_path")
+
 
 class Config:
-    """ Carica un config.yml e fornisce i path di un esperimento. """
+    """Configure experiment paths giving priority to explicit args > file config (if exists) > error. """
 
-    def __init__(self, config_path=None):
-        # Convertiamo sempre in Path se viene passata una stringa
-        self.config_path = Path(config_path) if config_path else self._find_config_file()
-        self.base_path = None
-        self.src_path = None
-        self.data_path = None
-        self._load()
+    def __init__(self, base_path=None, src_path=None, data_path=None, config_path=None):
+        explicit = {
+            k: v for k, v in
+            {"base_path": base_path, "src_path": src_path, "data_path": data_path}.items()
+            if v
+        }
 
-    def _find_config_file(self, start=None, filename=CONFIG_FILENAME):
-        current = (start or Path.cwd()).resolve()
-        stop_at = Path.home()
+        from_file = {}
+        if len(explicit) < len(REQUIRED_KEYS):      # file config is only used if something is missing
+            from_file = self._read_file(config_path)
 
-        while True:
-            candidate = current / filename
-            if candidate.is_file():
-                return candidate
-            if current == current.parent or current == stop_at:
-                break
-            current = current.parent
-
-        raise ConfigError(
-            f"'{filename}' non trovato in {Path.cwd()} o nelle cartelle superiori."
-        )
-
-    def _load(self):
-        if not self.config_path.is_file():
-            raise ConfigError(f"Config non trovata: {self.config_path}")
-
-        with open(self.config_path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f) or {}
-
-        missing = [k for k in REQUIRED_KEYS if not raw.get(k)]
+        merged = {**from_file, **explicit}           # explicit paths take precedence over file config
+        missing = [k for k in REQUIRED_KEYS if not merged.get(k)]
         if missing:
-            raise ConfigError(f"Campi mancanti o vuoti in {self.config_path}: {missing}")
+            raise ConfigError(
+                f"Path mancanti: {missing}. Passali come argomenti o definiscili in "
+                f"{config_path or DEFAULT_CONFIG}"
+            )
 
-        # Convertiamo anche questi in Path per coerenza con pathlib
-        self.base_path = Path(raw["base_path"])
-        self.src_path = Path(raw["src_path"])
-        self.data_path = Path(raw["data_path"])
+        self.base_path = Path(merged["base_path"])
+        self.src_path = Path(merged["src_path"])
+        self.data_path = Path(merged["data_path"])
+
+    @staticmethod
+    def _read_file(config_path):
+        if config_path:                              # file explicitly specified: must exist
+            path = Path(config_path)
+            if not path.is_file():
+                raise ConfigError(f"Config not found: {path}")
+        else:                                        # default next to module: optional
+            path = Path.cwd() / CONFIG_FILENAME
+            if not path.is_file():
+                return {}
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
 
     def folders(self, expname):
-        if not expname:  # Gestisce sia "" che None
+        """Return dictionary of experiment folders."""
+
+        # default folders
+        if not expname:  # handles both "" and None
             return {
                 'rebuild': str(self.src_path / "rebuild_nemo"),
                 'domain': str(self.data_path / "nemo" / "domain"),
@@ -87,7 +90,7 @@ class Config:
             'domain': str(self.data_path / "nemo" / "domain"),
         }
         
-        # Creazione cartelle in modo sicuro
+        # Creazione cartelle in modo sicuro. Careful on other users...
         Path(dirs['post']).mkdir(parents=True, exist_ok=True)
         Path(dirs['saveic']).mkdir(parents=True, exist_ok=True)
         
