@@ -24,8 +24,8 @@ def get_epoch(date):
 def get_year_fraction(date):
     """ Transform date into year fraction """
 
-    start_of_year = datetime.datetime(date.year, 1, 1, 0, 0, 0)
-    end_of_year = datetime.datetime(date.year+1, 1, 1, 0, 0, 0)
+    start_of_year = datetime.datetime(date.year,1,1,0,0,0)
+    end_of_year = datetime.datetime(date.year+1,1,1,0,0,0)
     year_elapsed = get_epoch(date) - get_epoch(start_of_year)
     year_duration = get_epoch(end_of_year) - get_epoch(start_of_year)
     Frac = year_elapsed/year_duration
@@ -62,10 +62,13 @@ def count_total_steps(start_year, end_year, steps_per_day):
 
     return total_steps
 
-def read_legfile(expname, config_path=None):
+
+#######################
+
+def read_legfile(expname):
     """ Read date & leg from legfile """
 
-    config = Config(config_path)
+    config = Config()
     dirs = config.folders(expname)
     legfile = os.path.join(dirs['exp'], 'leginfo.yml')
     with open(legfile, 'r', encoding='utf-8') as file:
@@ -125,3 +128,60 @@ def get_season_months():
     }
     
     return months_by_season
+
+
+######## NEW CLASSES
+
+class LegManager:
+    """
+    Gestisce la mappatura tra anni solari e 'leg' di simulazione 
+    per uno specifico esperimento.
+    """
+
+    def __init__(self, expname: str, year_zero: int = 1990, config_path: str = None):
+
+        self.expname = expname
+        self.year_zero = year_zero
+        self.config_path = config_path
+
+        # load config
+        self.config = Config(config_path=config_path)
+        self.dir_exp = self.config.folders(expname)['exp']
+
+    def read_legfile(self):
+        """ Read date & leg from legfile """
+
+        legfile = os.path.join(self.dir_exp, 'leginfo.yml')
+        if not legfile.is_file():
+            raise FileNotFoundError(f"leginfo.yml not found at: {legfile}")
+
+        with open(legfile, 'r', encoding='utf-8') as file:
+            leginfo = yaml.load(file, Loader=yaml.FullLoader)
+        
+        try:
+            info = leginfo['base.context']['experiment']['schedule']['leg']
+            endleg = info['num']
+            endyear = info['start'].year - 1
+            return endleg,endyear
+        except (KeyError, AttributeError, TypeError) as e:
+            raise KeyError(f"Struttura non valida all'interno di {legfile}: {e}")
+
+    def get_year_from_leg(self, leg: int) -> int:
+        """Convert leg number into solar year"""
+        return self.year_zero + leg - 1
+
+    def get_leg_from_year(self, year: int) -> int:
+        """Convert solar year into leg number"""
+        return year - self.year_zero + 1
+
+    def get_startleg(endleg: int, yearspan: int) -> int:
+        """Calcola il leg iniziale dato il leg finale e la durata."""
+        return endleg - yearspan + 1
+
+    def get_startyear(endyear: int, yearspan: int) -> int:
+        """Calcola l'anno iniziale dato l'anno finale e la durata."""
+        return endyear - yearspan + 1
+
+    def get_forecast_year(year: int, yearleap: int) -> int:
+        """Calcola l'anno di forecast proiettato."""
+        return year + yearleap

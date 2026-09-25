@@ -15,7 +15,7 @@ import logging
 import netCDF4 as nc
 import xarray as xr
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 
 ##########################################################################################
 
@@ -40,7 +40,7 @@ def _delete_attrs(file):
 ##########################################################################################
 # I/O operations on NEMO restarts
 
-def reader_nemo_restart(expname, leg):
+def reader_nemo_restart(expname, leg, config_path=None):
     """ 
     reader_nemo_restart: reader of NEMO restart files for a given leg
     
@@ -49,13 +49,15 @@ def reader_nemo_restart(expname, leg):
     leg: time leg
     """
 
-    dirs = config.folders(expname)
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
     
     flist = glob.glob(os.path.join(dirs['restart'], str(leg).zfill(3), expname + '*_' + 'restart' + '_????.nc'))        
     tstep = _get_nemo_timestep(flist[0])
 
     try:
-        filename = os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + tstep + '_restart.nc')
+        filename = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + '_' + tstep + '_restart.nc')
         time_coder = xr.coders.CFDatetimeCoder(use_cftime=True)
         data = xr.open_mfdataset(filename, decode_times=time_coder)
         return data
@@ -65,7 +67,7 @@ def reader_nemo_restart(expname, leg):
     return data
 
 
-def writer_nemo_restart(data, expname, leg):
+def writer_nemo_restart(data, expname, leg, config_path=None):
     """ 
     writer_nemo_restart: writer of NEMO restart files for a given leg in a temporary folder
     
@@ -74,26 +76,29 @@ def writer_nemo_restart(data, expname, leg):
     leg: time leg
     """
 
-    dirs = config.folders(expname)
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
+
     flist = glob.glob(os.path.join(dirs['restart'], str(leg).zfill(3), expname + '*_' + 'restart' + '_????.nc'))
     timestep = _get_nemo_timestep(flist[0])
 
     # ocean restart creation
-    filename = os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart.nc')
+    filename = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', 'restart.nc')
     data.to_netcdf(filename, mode='w', unlimited_dims={'time_counter': True})
 
     # delete attributes
     _delete_attrs(filename)
 
     # copy ice restart
-    inifile = os.path.join(dirs['tmp'], str(leg).zfill(3), expname + '_' + timestep + '_restart_ice.nc')
-    outfile = os.path.join(dirs['tmp'], str(leg).zfill(3), 'restart_ice.nc')
+    inifile = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + '_' + timestep + '_restart_ice.nc')
+    outfile = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', 'restart_ice.nc')
     shutil.copy(inifile, outfile)
 
     return None
 
 
-def update_nemo_restart(expname, leg, use_symlinks=False):
+def update_nemo_restart(expname, leg, config_path=None, use_symlinks=False):
     """
     Replace modified NEMO restart files in the run execution folder.
     
@@ -104,13 +109,10 @@ def update_nemo_restart(expname, leg, use_symlinks=False):
                              If False, copies them directly to the run folder.
     """
     
-    dirs = config.folders(expname)
-    
-    # Paths definition
-    run_dir = dirs['exp']
-    restart_store = dirs['restart']
-    temp_dir = dirs['tmp']
-    
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
+        
     # Format leg number (e.g., 1 -> '001')
     leg_id = str(leg).zfill(3)
     restart_files = ['restart.nc', 'restart_ice.nc']
@@ -126,7 +128,7 @@ def update_nemo_restart(expname, leg, use_symlinks=False):
     # 2. Deliver new files
     for filename in restart_files:
         # Define source and destination paths
-        source_temp = os.path.join(dirs['tmp'], leg_id, filename)
+        source_temp = os.path.join(dirs['saveic'], leg_id, 'nemo', filename)
         target_archive = os.path.join(dirs['restart'], leg_id, filename)
         run_destination = os.path.join(dirs['exp'], filename)
 
@@ -152,10 +154,12 @@ def update_nemo_restart(expname, leg, use_symlinks=False):
     return None
 
 
-def restore_nemo_restart(expname, leg):
+def restore_nemo_restart(expname, leg, config_path=None):
     """ Restore original nemo restart files """
 
-    dirs = config.folders(expname)
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
 
     # copying from the restart folder required for the leg you asked
     browser = ['*restart*']

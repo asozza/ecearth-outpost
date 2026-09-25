@@ -53,13 +53,13 @@ def plot_profile(expname, startyear, endyear, varname,
     # Read data from raw NEMO output
     if reader == 'nemo':
         data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear)
-        vec = timemean(data=data, format='global')
+        vec = timemean(data=data, mode='global')
         vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
 
     # Read data from post-processed data
     elif reader == 'post':
         data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                               diagname='profile', format='global', orca=orca, replace=replace)
+                               diagname='profile', mode='global', orca=orca, replace=replace)
         vec=data[varname].values.flatten()
 
     # fixing depth y-axis
@@ -115,19 +115,19 @@ def plot_profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endy
     # Read data from raw NEMO output
     if reader == 'nemo':
         data1 = reader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1)
-        vec = timemean(data=data1, format='global')
+        vec = timemean(data=data1, mode='global')
         vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
         #
         data2 = reader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2)
-        vec = timemean(data=data2, format='global')
+        vec = timemean(data=data2, mode='global')
         vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
 
     # Read data from post-processed data
     if reader == 'post':
         data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, 
-                            diagname='profile', format='global', orca=orca, replace=replace)
+                            diagname='profile', mode='global', orca=orca, replace=replace)
         data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, 
-                            diagname='profile', format='global', orca=orca, replace=replace)
+                            diagname='profile', mode='global', orca=orca, replace=replace)
         diff = data2[varname] - data1[varname]
         vec=diff.values.flatten()
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecpost"
-dynamic = ["version"]
+version = "0.0.1"
 authors = [
   { name="Alessandro Sozza", email="asozza.ph@gmail.com" },
 ]
@@ -12,7 +12,7 @@ description = "ecearth-outpost; output post-processing tools for EC-Earth4"
 readme = "README.md"
 keywords = ["climate", "modeling", "diagnostics", "hpc"]
 license = {file = "LICENSE"}
-requires-python = "==3.12"
+requires-python = ">=3.12"
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
@@ -24,11 +24,9 @@ dependencies = [
     "cdo"
 ]
 
-[tool.setuptools]
-py-modules = ["ecpost"]
-
-[tool.setuptools.dynamic]
-version = {file = "VERSION"}
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ecpost*"]
 
 [project.urls]
 "Homepage" = "https://github.com/asozza/ecearth-outpost"

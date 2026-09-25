@@ -17,8 +17,7 @@ from ecpost.core.utils import config
 from ecpost.core.utils import catalogue
 from ecpost.core.utils.time import get_decimal_year
 
-from ecpost.core.means.means import apply_cost_function, movave
-from ecpost.core.means.means import spacemean, year_shift
+from ecpost.core.means.means import movave, spacemean, year_shift
 from ecpost.core.io.reader import reader_nemo, reader_nemo_field
 from ecpost.core.io.postreader import postreader_nemo, averaging
 
@@ -32,7 +31,7 @@ def _rescaled(vec):
     return vec/vec[0]
 
 
-def plot_timeseries(expname, startyear, endyear, varname, format="plain", 
+def plot_timeseries(expname, startyear, endyear, varname, mode="plain", 
                reader="post", orca="ORCA2", replace=False,
                rescale=False, avetype="standard", timeoff=-1990, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
@@ -63,17 +62,17 @@ def plot_timeseries(expname, startyear, endyear, varname, format="plain",
     # Read data from raw NEMO output
     if reader == "nemo":
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varname=varname, diagname='timeseries', format=format, orca=orca)
+        data = averaging(data=data, varname=varname, diagname='timeseries', mode=mode, orca=orca)
         tvec = get_decimal_year(data['time'].values)
 
     # Read post-processed data
     elif reader == "post":
         data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace)
+                               diagname='timeseries', mode=mode, orca=orca, replace=replace)
         tvec = get_decimal_year(data['time'].values)
 
     # apply moving average
-    if (avetype == 'moving' and format == 'plain'):
+    if (avetype == 'moving' and mode == 'plain'):
         vec = movave(data[varname],12)
         tvec, vec = _cutted(tvec), _cutted(vec)
     else:
@@ -117,7 +116,7 @@ def plot_timeseries(expname, startyear, endyear, varname, format="plain",
 
 
 def plot_timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyear2, endyear2, varname, shift_threshold, 
-                         format='plain', reader="post", orca="ORCA2", replace=False, avetype="standard", timeoff=-1990, 
+                         mode='plain', reader="post", orca="ORCA2", replace=False, avetype="standard", timeoff=-1990, 
                          color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
     Graphics of year-shift timeseries 
@@ -146,22 +145,22 @@ def plot_timeseries_yearshift(expname1, startyear1, endyear1, expname2, startyea
     if reader == "nemo":
 
         data1 = reader_nemo_field(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname)        
-        data1 = averaging(data=data1, varname=varname, diagname='timeseries', format=format, orca=orca)
+        data1 = averaging(data=data1, varname=varname, diagname='timeseries', mode=mode, orca=orca)
         tvec1 = get_decimal_year(data1['time'].values)
 
         data2 = reader_nemo_field(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname)        
-        data2 = averaging(data=data2, varname=varname, diagname='timeseries', format=format, orca=orca)
+        data2 = averaging(data=data2, varname=varname, diagname='timeseries', mode=mode, orca=orca)
         tvec2 = get_decimal_year(data2['time'].values)
 
     # Read post-processed data
     elif reader == "post":
 
         data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace)
+                               diagname='timeseries', mode=mode, orca=orca, replace=replace)
         tvec1 = get_decimal_year(data1['time'].values)
 
         data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, 
-                               diagname='timeseries', format=format, orca=orca, replace=replace)
+                               diagname='timeseries', mode=mode, orca=orca, replace=replace)
         tvec2 = get_decimal_year(data2['time'].values)
 
         # apply moving average
@@ -329,7 +328,7 @@ def plot_timeseries_yearshift_mean(expname1, startyear1, endyear1, expname2, sta
     return pp
 
 
-def plot_timeseries_with_markers(expname, startyear, endyear, varname, format="plain", 
+def plot_timeseries_with_markers(expname, startyear, endyear, varname, mode="plain", 
                reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
                rescale=False, avetype="standard", timeoff=0, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
@@ -362,7 +361,7 @@ def plot_timeseries_with_markers(expname, startyear, endyear, varname, format="p
     if reader == "nemo":
 
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varname=varname, diagname='timeseries', format=format, orca=orca)
+        data = averaging(data=data, varname=varname, diagname='timeseries', mode=mode, orca=orca)
         tvec = get_decimal_year(data['time'].values)
 
     # Read post-processed data

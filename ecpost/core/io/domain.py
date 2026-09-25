@@ -13,7 +13,7 @@ import glob
 import logging
 import xarray as xr
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 
 ##########################################################################################
 # Reader of NEMO domain
@@ -25,10 +25,13 @@ def preproc_nemo_domain(data):
 
     return data
 
-def read_domain(orca='ORCA2'):
+def read_domain(orca='ORCA2', config_path=None):
     """ Read NEMO domain configuration file """
 
-    dirs = config.folders('')
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders("")
+
     filename = os.path.join(dirs['domain'], orca, 'domain_cfg.nc')
     domain = xr.open_mfdataset(filename, preprocess=preproc_nemo_domain)
     domain = domain.isel(time=0)

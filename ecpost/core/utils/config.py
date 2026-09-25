@@ -5,82 +5,93 @@
 Folder definitions
 
 Author: Alessandro Sozza (CNR-ISAC)
-Date: Mar 2024
+Date: July 2026
 """
 
 import os
 import yaml
 import logging
-import platform
+from pathlib import Path
 
-logging.basicConfig(
-    #filename='logfile.log',
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def get_project_root(cwd=None, project_name="ecearth-outpost"):
-    """ Get base folder of the github project """
-
-    if cwd is None:
-        cwd = os.getcwd()
-
-    parts = cwd.split(os.sep)
-
-    if project_name in parts:
-        idx = parts.index(project_name)
-        root = os.sep.join(parts[:idx+1])
-        return root
-
-    raise RuntimeError(f"Folder '{project_name}' not found in path: {cwd}")
+CONFIG_FILENAME = "config.yml"
+REQUIRED_KEYS = ("base_path", "src_path", "data_path")
 
 
-def load_config():
-    """ Load configuration file """
+class ConfigError(RuntimeError):
+    pass
 
-    project_root = get_project_root()
-    config_path = os.path.join(project_root, "config.yml")
+CONFIG_FILENAME = "config.yml"
+DEFAULT_CONFIG = Path(__file__).resolve().parent / CONFIG_FILENAME
+REQUIRED_KEYS = ("base_path", "src_path", "data_path")
 
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            return yaml.safe_load(f)
 
-    logging.warning(f"Config file not found at path: {config_path}. Using empty config.")
+class Config:
+    """Configure experiment paths giving priority to explicit args > file config (if exists) > error. """
 
-    return {}
-    
-
-def folders(expname):
-    """ List of global paths dependent on expname """
-    
-    system = platform.system().lower()
-    config = load_config()
-    config = config.get(system)    
-    base_path = config.get("base_path")
-    src_path = config.get("src_path")
-    data_path = config.get("data_path")
-
-    if expname == "":
-        dirs = {
-            'rebuild': os.path.join(src_path, "rebuild_nemo"),
-            'domain': os.path.join(data_path, "nemo", "domain")
+    def __init__(self, base_path=None, src_path=None, data_path=None, config_path=None):
+        explicit = {
+            k: v for k, v in
+            {"base_path": base_path, "src_path": src_path, "data_path": data_path}.items()
+            if v
         }
-    else:
+
+        from_file = {}
+        if len(explicit) < len(REQUIRED_KEYS):      # file config is only used if something is missing
+            from_file = self._read_file(config_path)
+
+        merged = {**from_file, **explicit}           # explicit paths take precedence over file config
+        missing = [k for k in REQUIRED_KEYS if not merged.get(k)]
+        if missing:
+            raise ConfigError(
+                f"Path mancanti: {missing}. Passali come argomenti o definiscili in "
+                f"{config_path or DEFAULT_CONFIG}"
+            )
+
+        self.base_path = Path(merged["base_path"])
+        self.src_path = Path(merged["src_path"])
+        self.data_path = Path(merged["data_path"])
+
+    @staticmethod
+    def _read_file(config_path):
+        if config_path:                              # file explicitly specified: must exist
+            path = Path(config_path)
+            if not path.is_file():
+                raise ConfigError(f"Config not found: {path}")
+        else:                                        # default next to module: optional
+            path = Path.cwd() / CONFIG_FILENAME
+            if not path.is_file():
+                return {}
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
+    def folders(self, expname):
+        """Return dictionary of experiment folders."""
+
+        # default folders
+        if not expname:  # handles both "" and None
+            return {
+                'rebuild': str(self.src_path / "rebuild_nemo"),
+                'domain': str(self.data_path / "nemo" / "domain"),
+            }
+
+        exp_base = self.base_path / expname
         dirs = {
-            'exp': os.path.join(base_path, expname),
-            'nemo': os.path.join(base_path, expname, "output", "nemo"),
-            'oifs': os.path.join(base_path, expname, "output", "oifs"),
-            'restart': os.path.join(base_path, expname, "restart"),
-            'log': os.path.join(base_path, expname, "log"),
-            'tmp': os.path.join(base_path, expname, "tmp"),
-            'post': os.path.join(base_path, expname, "post"),
-            'rebuild': os.path.join(src_path, "rebuild_nemo"),
-            'domain': os.path.join(data_path, "nemo", "domain")
+            'exp': str(exp_base),
+            'nemo': str(exp_base / "output" / "nemo"),
+            'oifs': str(exp_base / "output" / "oifs"),
+            'restart': str(exp_base / "restart"),
+            'log': str(exp_base / "log"),
+            'saveic': str(exp_base / "saveic"),
+            'post': str(exp_base / "post"),
+            'rebuild': str(self.src_path / "rebuild_nemo"),
+            'domain': str(self.data_path / "nemo" / "domain"),
         }
         
-        # Create 'post' & 'tmp' folder if it doesn't exist
-        os.makedirs(dirs['post'], exist_ok=True)
-        os.makedirs(dirs['tmp'], exist_ok=True)
-
-    return dirs
-
+        # Creazione cartelle in modo sicuro. Careful on other users...
+        Path(dirs['post']).mkdir(parents=True, exist_ok=True)
+        Path(dirs['saveic']).mkdir(parents=True, exist_ok=True)
+        
+        return dirs

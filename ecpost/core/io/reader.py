@@ -10,15 +10,11 @@ Date: Nov 2025
 
 import os
 import glob
-import shutil
-import subprocess
 import logging
 import xarray as xr
-import cftime
 
-from ecpost.core.utils import config
+from ecpost.core.utils.config import Config
 from ecpost.core.utils import catalogue
-
 
 ##########################################################################################
 # Detector of axis candidates
@@ -81,7 +77,7 @@ def _nemodict(grid, freq):
 
     grid = grid.upper().strip()
     grid_lower = grid.lower()
-
+    
     if grid in ["T", "U", "V"]:
         return {
             grid: {
@@ -97,7 +93,6 @@ def _nemodict(grid, freq):
             }
         }
     elif grid == "W":
-        grid_lower = grid.lower()
         return {
             "W": {
                 "preproc": preproc_nemo,
@@ -107,7 +102,7 @@ def _nemodict(grid, freq):
                 "depth": [f"depth{grid_lower}", "z"]
             }
         }
-    elif grid == "ice":
+    elif grid_lower == "ice":
         return {
             "ice": {
                 "preproc": preproc_nemo_ice,
@@ -168,7 +163,7 @@ def preproc_nemo_ice(data):
     return data
 
 
-def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
+def reader_nemo(expname, startyear, endyear, grid="T", freq="1m", config_path=None):
     """ 
     reader_nemo: function to read NEMO data 
     
@@ -180,7 +175,11 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
 
     """
 
-    dirs = config.folders(expname)
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
+
+    # dictionary of NEMO output features
     dict = _nemodict(grid, freq)
 
     filelist = []
@@ -213,7 +212,7 @@ def reader_nemo(expname, startyear, endyear, grid="T", freq="1m"):
     return data
 
 
-def reader_nemo_field(expname, startyear, endyear, varname, freq="1m"):
+def reader_nemo_field(expname, startyear, endyear, varname, freq="1m", config_path=None):
     """ 
     reader_nemo_field: function to read NEMO field 
     
@@ -230,13 +229,13 @@ def reader_nemo_field(expname, startyear, endyear, varname, freq="1m"):
     if 'dependencies' in info: 
         field = {}
         for grid, var in zip(info['grid'], info['dependencies']):
-            data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=grid)
+            data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=grid, config_path=config_path)
             field[var] = data[var]
             if 'preprocessing' in info and var in info['preprocessing']:
                 field[var] = info['preprocessing'][var](field[var])
         data = info['operation'](*[field[var] for var in info['dependencies']])
     else:
-        data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=info['grid'], freq=freq)
+        data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear, grid=info['grid'], freq=freq, config_path=config_path)
         data = data[[varname]]
 
     return data
