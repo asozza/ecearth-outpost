@@ -20,13 +20,20 @@ classifiers = [
     "Programming Language :: Python :: 3.12"
 ]
 dependencies = [
+    "xarray",
+    "psutil",
+    "numpy",
+    "xeofs",
+    "gsw",
     "ruamel.yaml",
     "cdo"
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["ecpost*"]
+include = ["src"]
+
+[project.scripts]
+climatology = "ecpost.launch.run:main"
 
 [project.urls]
 "Homepage" = "https://github.com/asozza/ecearth-outpost"
