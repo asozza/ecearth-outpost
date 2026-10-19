@@ -15,11 +15,11 @@ import dask
 import cftime
 import matplotlib.pyplot as plt
 
-from cauda.utils import catalogue
-from cauda.actions.reader import reader_nemo_field
-from cauda.actions.postreader import postreader_nemo, averaging
-from cauda.utils.time import get_decimal_year
-from cauda.means.means import apply_cost_function, movave
+from ecpost.utils import catalogue
+from ecpost.actions.reader import reader_nemo_field
+from ecpost.io.postreader import postreader_nemo, averaging
+from ecpost.utils.time import get_decimal_year
+from ecpost.means.means import apply_cost_function, movave
 
 
 def _cutted(data):

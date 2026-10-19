@@ -12,7 +12,7 @@ import os
 import glob
 import subprocess
 
-from ecpost.core.utils.config import Config
+from ecpost.utils.config import Config
 
 def _get_nemo_timestep(filename):
     """ Get timestep from a NEMO restart file """

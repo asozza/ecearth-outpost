@@ -13,13 +13,13 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from ecpost.core.utils import config
-from ecpost.core.utils import catalogue
-from ecpost.core.utils.time import get_decimal_year
+from ecpost.utils import config
+from ecpost.utils import catalogue
+from ecpost.utils.time import get_decimal_year
 
-from ecpost.core.means.means import movave, spacemean, year_shift
-from ecpost.core.io.reader import reader_nemo, reader_nemo_field
-from ecpost.core.io.postreader import postreader_nemo, averaging
+from ecpost.means.means import movave, spacemean, year_shift
+from ecpost.io.reader import reader_nemo, reader_nemo_field
+from ecpost.io.postreader import postreader_nemo, averaging
 
 
 def _cutted(vec):

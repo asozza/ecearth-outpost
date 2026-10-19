@@ -12,8 +12,8 @@ import os
 import numpy as np
 import xarray as xr
 
-from ecpost.core.utils import config
-from ecpost.core.io.domain import read_domain
+from ecpost.utils import config
+from ecpost.io.domain import read_domain
 
 #################################################################################
 # Da migliorare?

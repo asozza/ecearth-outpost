@@ -14,7 +14,7 @@ import cftime
 import logging
 from scipy.interpolate import interp1d
 
-from ecpost.core.io.domain import elements
+from ecpost.io.domain import elements
 
 # dictionary of months by seasons
 season_months = {

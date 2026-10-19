@@ -14,7 +14,7 @@ import cftime
 
 from scipy.interpolate import interp1d
 
-from ecpost.core.io.domain import elements
+from ecpost.io.domain import elements
 
 # dictionary of months by seasons
 season_months = {
@@ -186,7 +186,7 @@ def window_mean(ds0, window):
     return new_ds
 
 
-def spacemean(data, ndim, orca='ORCA2'):
+def spacemean(data, ndim, orca='ORCA2', config_path=None):
     """ 
     Spatial average of a field 
     
@@ -194,10 +194,11 @@ def spacemean(data, ndim, orca='ORCA2'):
     data (DataArray): field
     ndim (string): dimensions <'1D','2D','3D'>
     orca (string): ORCA resolution <ORCA2,eORCA...>
+    config_path (string): path to config file (to locate the domain)
     
     """
 
-    df = elements(orca) 
+    df = elements(orca, config_path) 
 
     if ndim == '3D':
         ave = data.weighted(df['V']).mean(dim=['z', 'y', 'x'])

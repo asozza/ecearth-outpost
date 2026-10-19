@@ -16,7 +16,7 @@ import subprocess
 import netCDF4 as nc
 import xarray as xr
 
-from ecpost.core.utils.config import Config
+from ecpost.utils.config import Config
 
 class NemoRestart():
     """

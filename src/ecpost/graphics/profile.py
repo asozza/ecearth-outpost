@@ -15,11 +15,11 @@ import cftime
 #import nc_time_axis
 import matplotlib.pyplot as plt
 
-from ecpost.core.utils import config
-from ecpost.core.utils import catalogue
-from ecpost.core.io.reader import reader_nemo
-from ecpost.core.io.postreader import postreader_nemo
-from ecpost.core.means.means import spacemean, timemean
+from ecpost.utils import config
+from ecpost.utils import catalogue
+from ecpost.io.reader import reader_nemo
+from ecpost.io.postreader import postreader_nemo
+from ecpost.means.means import spacemean, timemean
 
 
 def _rescaled(vec):

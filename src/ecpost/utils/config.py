@@ -9,6 +9,7 @@ Date: July 2026
 """
 
 import os
+import sys
 import yaml
 import logging
 from pathlib import Path
@@ -16,12 +17,9 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-CONFIG_FILENAME = "config.yml"
-REQUIRED_KEYS = ("base_path", "src_path", "data_path")
-
-
 class ConfigError(RuntimeError):
     pass
+
 
 CONFIG_FILENAME = "config.yml"
 DEFAULT_CONFIG = Path(__file__).resolve().parent / CONFIG_FILENAME
@@ -65,7 +63,11 @@ class Config:
             if not path.is_file():
                 return {}
         with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            raw = yaml.safe_load(f) or {}
+        # optional per-platform sections (e.g. 'darwin', 'linux'), see config-example.yml
+        if isinstance(raw.get(sys.platform), dict):
+            raw = raw[sys.platform]
+        return raw
 
     def folders(self, expname):
         """Return dictionary of experiment folders."""

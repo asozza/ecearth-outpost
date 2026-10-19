@@ -19,12 +19,12 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
-from ecpost.core.utils import config
-from ecpost.core.utils import catalogue
-from ecpost.core.utils.time import get_decimal_year
+from ecpost.utils import config
+from ecpost.utils import catalogue
+from ecpost.utils.time import get_decimal_year
 
-from ecpost.core.io.postreader import postreader_nemo
-from ecpost.core.means.means import movave, spacemean
+from ecpost.io.postreader import postreader_nemo
+from ecpost.means.means import movave, spacemean
 
 def _cutted(vec):
     """ Cut vector """

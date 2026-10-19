@@ -2,11 +2,18 @@
 # -*- coding: utf-8 -*-
 
 """
-This is a command line tool to modfy the NEMO restart files from a specific EC-Eart4
-experiment, given a specific experiment and leg. 
+Command line tool to produce light-weight aggregated data from the NEMO output of an
+EC-Earth4 experiment: timeseries, vertical profiles, hovmoller diagrams, horizontal maps
+and time-averaged fields. Files are written in the experiment 'post' folder as
+<expname>_<startyear>-<endyear>_<varname>_<diagname>_<mode>[_<metric>].nc
+
+Examples:
+    climatology cs00 1990 1999 -v thetao tos
+    climatology cs00 1990 1999 -v thetao -d timeseries:yearly profile map:seasonally --config config.yml
+    climatology cs01 1990 1999 -v thetao -d profile --metric diff --ref cs00 1990 1999
 
 Needed modules:
-# module load intel/2021.4.0 intel-mkl/19.0.5 prgenv/intel hdf5 netcdf4 
+# module load intel/2021.4.0 intel-mkl/19.0.5 prgenv/intel hdf5 netcdf4
 # export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/apps/netcdf4/4.9.1/INTEL/2021.4/lib:/usr/local/apps/hdf5/1.12.2/INTEL/2021.4/lib
 
 Authors: Alessandro Sozza (CNR-ISAC)
@@ -16,49 +23,130 @@ Date: May 2024
 import argparse
 import logging
 import sys
-import datetime
-import os
-import xarray as xr
 
-from ecpost.core.utils.config import Config
-from ecpost.core.io.postreader import get_climatology
+from ecpost.utils import catalogue
+from ecpost.utils.config import Config
+from ecpost.io.postreader import DIAGNOSTICS, check_diagnostic, get_output_path, postreader_nemo_multi
 
-def parse_args():
-    """Command line parser for nemo-restart"""
+# diagnostics produced when none is requested
+DEFAULT_DIAGNOSTICS = ["timeseries", "profile", "hovmoller", "map", "field"]
 
-    parser = argparse.ArgumentParser(description="Command Line Parser for nemo-restart")
 
-    # add positional argument (mandatory)
+def parse_args(argv=None):
+    """Command line parser for climatology"""
+
+    parser = argparse.ArgumentParser(description="Produce aggregated data (timeseries, profiles, hovmoller, maps, fields) from NEMO output")
+
+    # positional arguments (mandatory)
     parser.add_argument("expname", metavar="EXPNAME", help="Experiment name")
+    parser.add_argument("startyear", metavar="STARTYEAR", help="Starting year", type=int)
     parser.add_argument("endyear", metavar="ENDYEAR", help="Ending year", type=int)
-    parser.add_argument("window", metavar="WINDOW", help="EOF window", type=int)
-    parser.add_argument("years_to_skip", metavar="YEARS_TO_SKIP", help="Years to skip", type=int)
-    parser.add_argument("config_file", metavar="CONFIG_FILE", help="Configuration file", type=str)
 
-    # optional to activate nemo rebuild
-    parser.add_argument("--rebuild", action="store_true", help="Enable nemo-rebuild")
-    parser.add_argument("--forecast", action="store_true", help="Create forecast")
-    #parser.add_argument("--mode", choices=['first', 'full', 'other'], default='full', help="Mode for processing")
-    #parser.add_argument("--replace", action="store_true", help="Replace nemo restart files")
-    #parser.add_argument("--restore", action="store_true", help="Restore nemo restart files")
+    # optional arguments
+    parser.add_argument("-v", "--vars", nargs="+", required=True, metavar="VAR", help="NEMO variable names (see catalogue)")
+    parser.add_argument("-d", "--diags", nargs="+", default=DEFAULT_DIAGNOSTICS, metavar="DIAG[:MODE]",
+                        help=f"Diagnostics, optionally with time mode. Available: "
+                             + "; ".join(f"{d} [{', '.join(v['modes'])}]" for d, v in DIAGNOSTICS.items())
+                             + ". Default mode is the first one. Default: %(default)s")
+    parser.add_argument("--orca", default="ORCA2", help="ORCA configuration [ORCA2, eORCA1]")
+    parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml)")
+    parser.add_argument("--metric", default="base", help="Metric with respect to the reference climatology [base, diff, ...]")
+    parser.add_argument("--ref", nargs=3, metavar=("REFEXP", "REFSTART", "REFEND"), help="Reference experiment and time window (needed by --metric)")
+    parser.add_argument("--replace", action="store_true", help="Recompute and replace existing aggregated files")
+    parser.add_argument("--cleanup", action="store_true", help="Remove single-year and redundant merged files after merging")
+    parser.add_argument("--quiet", action="store_true", help="Do not print the aggregated data")
 
-    parsed = parser.parse_args()
+    parsed = parser.parse_args(argv)
+
+    if parsed.endyear < parsed.startyear:
+        parser.error("ENDYEAR must be >= STARTYEAR")
+    if parsed.metric != "base" and parsed.ref is None:
+        parser.error("--metric requires --ref REFEXP REFSTART REFEND")
 
     return parsed
 
 
-if __name__ == "__main__":
-    
+def parse_diagnostics(diags):
+    """ Convert ['timeseries:yearly', 'map', ...] into [('timeseries', 'yearly'), ('map', 'global'), ...] """
+
+    out = []
+    for item in diags:
+        diagname, _, mode = item.partition(":")
+        if diagname not in DIAGNOSTICS:
+            raise ValueError(f"Unknown diagnostic '{diagname}'. Choose among {list(DIAGNOSTICS)}")
+        out.append((diagname, mode or DIAGNOSTICS[diagname]["modes"][0]))
+
+    return out
+
+
+def main(argv=None):
+
     # parser
-    args = parse_args()
-    expname = args.expname
-    endyear = args.endyear
-    window = args.window
-    years_to_skip = args.years_to_skip
-    config_file = args.config_file
+    args = parse_args(argv)
+    logging.getLogger().setLevel(logging.INFO)
+
+    try:
+        diagnostics = parse_diagnostics(args.diags)
+    except ValueError as e:
+        logging.error(e)
+        return 2
+
+    refinfo = None
+    if args.ref is not None:
+        refinfo = {"expname": args.ref[0], "startyear": int(args.ref[1]), "endyear": int(args.ref[2])}
 
     # define folders
-    config = Config(args.config_file)
-    dirs = config.folders(expname)
+    config = Config(config_path=args.config_file)
+    dirs = config.folders(args.expname)
 
-    get_climatology(expname='cs00', startyear=6069, endyear=6999, varname='thetao')
+    varlist = catalogue.observables('nemo')
+    produced, failed = [], []
+    for varname in args.vars:
+
+        if varname not in varlist:
+            logging.error(f"Unknown variable '{varname}': skipped")
+            failed.append((varname, "unknown variable"))
+            continue
+
+        # keep only the diagnostics compatible with the variable
+        valid = []
+        for diagname, mode in diagnostics:
+            try:
+                check_diagnostic(varname, diagname, mode)
+                valid.append((diagname, mode))
+            except ValueError as e:
+                logging.warning(f"Skipping {varname} {diagname}:{mode}: {e}")
+        if not valid:
+            continue
+
+        try:
+            results = postreader_nemo_multi(expname=args.expname, startyear=args.startyear, endyear=args.endyear,
+                                            varname=varname, diagnostics=valid, metric=args.metric, refinfo=refinfo,
+                                            orca=args.orca, replace=args.replace, cleanup=args.cleanup,
+                                            config_path=args.config_file)
+        except Exception as e:
+            logging.exception(f"Failed to process {varname}: {e}")
+            failed.append((varname, str(e)))
+            continue
+
+        for (diagname, mode), data in results.items():
+            filename = get_output_path(dirs['post'], args.expname, args.startyear, args.endyear,
+                                       varname, diagname, mode, args.metric)
+            produced.append(filename)
+            if not args.quiet:
+                print(f"\n=== {varname} | {diagname} | {mode} | {args.metric} ===")
+                print(f"file: {filename}")
+                print(data.load())
+            data.close()
+
+    print("\nSummary:")
+    for f in produced:
+        print(f"  [ok]   {f}")
+    for varname, err in failed:
+        print(f"  [fail] {varname}: {err}")
+
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

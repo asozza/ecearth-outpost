@@ -9,19 +9,25 @@ Date: June 2024
 """
 
 import os
-import glob
 import logging
+import functools
 import xarray as xr
 
-from ecpost.core.utils.config import Config
+from ecpost.utils.config import Config
 
 ##########################################################################################
 # Reader of NEMO domain
 
 def preproc_nemo_domain(data):
-    """ Pre-processing routine for nemo domain """
+    """ Pre-processing routine for nemo domain: drop the singleton time axis """
 
-    data = data.rename({'time_counter': 'time'})
+    # domain_cfg.nc may use 't', 'time_counter' or 'time' as (singleton) time dimension
+    for dim in ('t', 'time_counter', 'time'):
+        if dim in data.dims:
+            data = data.isel({dim: 0})
+    for var in ('time_counter', 'time'):
+        if var in data.variables:
+            data = data.drop_vars(var)
 
     return data
 
@@ -33,16 +39,17 @@ def read_domain(orca='ORCA2', config_path=None):
     dirs = cfg.folders("")
 
     filename = os.path.join(dirs['domain'], orca, 'domain_cfg.nc')
-    domain = xr.open_mfdataset(filename, preprocess=preproc_nemo_domain)
-    domain = domain.isel(time=0)
+    domain = xr.open_dataset(filename)
+    domain = preproc_nemo_domain(domain)
 
     return domain
 
-def elements(orca='ORCA2'):
-    """ Define differential forms for integrals """
+@functools.lru_cache(maxsize=4)
+def elements(orca='ORCA2', config_path=None):
+    """ Define differential forms for integrals (cached: the domain is read once per grid) """
 
     df = {}
-    domain = read_domain(orca)
+    domain = read_domain(orca, config_path=config_path).load()
     df['V'] = domain['e1t']*domain['e2t']*domain['e3t_0']
     df['S'] = domain['e1t']*domain['e2t']
     df['x'] = domain['e1t']

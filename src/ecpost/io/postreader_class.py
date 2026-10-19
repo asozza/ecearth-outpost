@@ -14,10 +14,10 @@ import logging
 import numpy as np
 import xarray as xr
 
-from ecpost.core.utils import catalogue  
-from ecpost.core.utils.config import Config
-from ecpost.core.io.reader import reader_nemo_field
-from ecpost.core.means.means import apply_cost_function, spacemean, timemean
+from ecpost.utils import catalogue  
+from ecpost.utils.config import Config
+from ecpost.io.reader import reader_nemo_field
+from ecpost.means.means import apply_cost_function, spacemean, timemean
 
 # dictionary of months by seasons
 season_months = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}

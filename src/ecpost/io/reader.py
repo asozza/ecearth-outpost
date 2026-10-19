@@ -13,8 +13,8 @@ import glob
 import logging
 import xarray as xr
 
-from ecpost.core.utils.config import Config
-from ecpost.core.utils import catalogue
+from ecpost.utils.config import Config
+from ecpost.utils import catalogue
 
 ##########################################################################################
 # Detector of axis candidates
