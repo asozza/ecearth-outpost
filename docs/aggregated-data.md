@@ -1,31 +1,46 @@
 # Aggregated data
 
-The NEMO output is reduced to light-weight files (timeseries, profiles, hovmoller
-diagrams, maps, time-averaged fields) stored in the experiment `post` folder.
+The NEMO output is reduced to light-weight files stored in the experiment `post` folder.
 The core is [`ecpost.io.postreader`](../src/ecpost/io/postreader.py); the
 `climatology` command is a thin wrapper around it.
+
+## Diagnostics
+
+Only four diagnostics are computed from the raw output:
+
+| Diagnostic   | Variables | Space mean          | Time mean          | Output dims   |
+|--------------|-----------|---------------------|--------------------|---------------|
+| `timeseries` | 2D, 3D    | surface / volume    | none (monthly)     | `time`        |
+| `hovmoller`  | 3D        | horizontal          | none (monthly)     | `time, z`     |
+| `map`        | 2D, 3D    | vertical (3D only)  | over the window    | `y, x`        |
+| `field`      | 2D, 3D    | none                | over the window    | `[z,] y, x`   |
+
+Everything else is a time mean of `timeseries` or `hovmoller`, computed on the fly
+when reading (see [Derived products](#derived-products)): yearly series, seasonal
+cycles, vertical profiles, single values. Space and time means commute because the
+grid weights (`domain_cfg.nc`) do not change in time; land points (NaN) are ignored.
 
 ## Command line
 
 ```bash
-climatology EXPNAME STARTYEAR ENDYEAR -v VAR [VAR ...] [-d DIAG[:MODE] ...] [options]
+climatology EXPNAME STARTYEAR ENDYEAR -v VAR [VAR ...] [-d DIAG ...] [options]
 ```
 
 ```bash
-# default diagnostics (timeseries, profile, hovmoller, map, field)
+# all diagnostics
 climatology cs00 1990 1999 -v thetao tos --config config.yml
 
-# choose diagnostics and time modes
-climatology cs00 1990 1999 -v thetao -d timeseries:yearly profile map:seasonally
+# only some diagnostics
+climatology cs00 1990 1999 -v thetao -d timeseries hovmoller
 
 # difference with respect to the climatology of a reference experiment
-climatology cs01 1990 1999 -v thetao -d profile --metric diff --ref cs00 1990 1999
+climatology cs01 1990 1999 -v thetao -d hovmoller --metric diff --ref cs00 1990 1999
 ```
 
 | Option       | Meaning                                                        |
 |--------------|----------------------------------------------------------------|
 | `-v`         | variables, as named in [catalogue](../src/ecpost/utils/catalogue.py) |
-| `-d`         | diagnostics, optionally `diag:mode` (default mode: first in table below) |
+| `-d`         | diagnostics (default: all); not applicable ones are skipped    |
 | `--config`   | configuration file (default `./config.yml`)                    |
 | `--orca`     | grid, `ORCA2` (default) or `eORCA1`                            |
 | `--metric`   | `base` (default), `diff`, `norm`, … ; requires `--ref`         |
@@ -36,55 +51,54 @@ climatology cs01 1990 1999 -v thetao -d profile --metric diff --ref cs00 1990 19
 
 Without installing the package: `PYTHONPATH=src python -m ecpost.launch.launch_climatology ...`
 
-## Diagnostics
-
-| Diagnostic   | Variables | Modes                                          | Output dims                  |
-|--------------|-----------|------------------------------------------------|------------------------------|
-| `timeseries` | 2D, 3D    | plain, yearly, monthly, seasonally, global     | time axis only               |
-| `profile`    | 3D        | global, monthly, seasonally                    | `z`                          |
-| `hovmoller`  | 3D        | plain, yearly                                  | time axis × `z`              |
-| `map`        | 2D, 3D    | global, monthly, seasonally                    | `y, x` (3D: vertical mean)   |
-| `field`      | 2D, 3D    | global, monthly, seasonally                    | `[z,] y, x`                  |
-| `scalar`     | 2D, 3D    | global                                         | none                         |
-
-Time modes:
-
-- `plain`: monthly values as in the output (`time`)
-- `yearly`: annual means (`year`)
-- `monthly` / `seasonally`: climatological cycle (`month` / `season`)
-- `global`: mean over the whole window
-
-Spatial means are weighted with the cell metrics of `domain_cfg.nc`
-(volume, area or layer thickness); land points (NaN) are ignored.
-
 ## How it works
 
-1. For each requested diagnostic, if `EXP_Y1-Y2_VAR_DIAG_MODE.nc` already exists it is
-   read and nothing else is done (unless `--replace`).
+Files are named `EXP_Y1-Y2_VAR_DIAG[_METRIC].nc`.
+
+1. If the file for the requested window already exists it is read and nothing else
+   is done (unless `--replace`).
 2. Existing multi-year files lying **inside** `[Y1, Y2]` are reused; the remaining
    years are computed one by one. Raw data of each year are read **once** for all
-   diagnostics and written as single-year files `EXP_Y-Y_VAR_DIAG_MODE.nc`.
-3. Single-year files and reused blocks are merged into `EXP_Y1-Y2_VAR_DIAG_MODE.nc`:
-   - data with a `time` or `year` axis are concatenated;
-   - all the others (climatologies) are averaged, weighting each file by its number of years.
+   diagnostics and written as single-year files `EXP_Y-Y_VAR_DIAG.nc`.
+3. Single-year files and reused blocks are merged into `EXP_Y1-Y2_VAR_DIAG.nc`:
+   `timeseries` and `hovmoller` are concatenated in time, `map` and `field` are
+   averaged weighting each file by its number of years.
 
 Extending a window (e.g. 1990-1999 → 1990-2009) therefore only processes the new years.
-With a metric other than `base`, the suffix `_METRIC` is appended to the file names.
+With a metric other than `base`, the metric is applied to the raw data before any
+average, so derived products remain consistent also for non-linear metrics.
 
 ## Python API
 
 ```python
-from ecpost.io.postreader import postreader_nemo, postreader_nemo_multi, get_climatology
+from ecpost.io.postreader import postreader_nemo, postreader_nemo_multi
 
 # one diagnostic
-ds = postreader_nemo("cs00", 1990, 1999, "thetao", "profile", mode="global", config_path="config.yml")
+ds = postreader_nemo("cs00", 1990, 1999, "thetao", "hovmoller", config_path="config.yml")
 
 # several diagnostics, raw data read once per year
-res = postreader_nemo_multi("cs00", 1990, 1999, "thetao",
-                            diagnostics=[("timeseries", "yearly"), ("map", "global")],
-                            config_path="config.yml")
-res[("map", "global")]
+res = postreader_nemo_multi("cs00", 1990, 1999, "thetao", ["timeseries", "map"], config_path="config.yml")
+res["map"]
+```
 
-# time-averaged field (same as diagnostic 'field', mode 'global')
-clim = get_climatology("cs00", 1990, 1999, "thetao", config_path="config.yml")
+### Derived products
+
+Time means of the stored diagnostics; extra keyword arguments are passed to
+`postreader_nemo` (`metric`, `refinfo`, `orca`, `replace`, `config_path`, …).
+
+| Function                                  | From         | `mode`                                        |
+|-------------------------------------------|--------------|-----------------------------------------------|
+| `get_timeseries(exp, y1, y2, var, mode)`  | `timeseries` | `plain` (default), `yearly`, `monthly`, `seasonally`, `global` |
+| `get_hovmoller(exp, y1, y2, var, mode)`   | `hovmoller`  | `plain` (default), `yearly`                   |
+| `get_profile(exp, y1, y2, var, mode)`     | `hovmoller`  | `global` (default), `monthly`, `seasonally`   |
+| `get_climatology(exp, y1, y2, var)`       | `field`      | —                                             |
+
+`monthly` / `seasonally` give the climatological cycle (`month` / `season` dims),
+`yearly` the annual means (`year` dim), `global` the mean over the whole window.
+
+```python
+from ecpost.io.postreader import get_timeseries, get_profile
+
+annual = get_timeseries("cs00", 1990, 1999, "thetao", mode="yearly", config_path="config.yml")
+prof = get_profile("cs00", 1990, 1999, "thetao", mode="seasonally", config_path="config.yml")
 ```

@@ -15,34 +15,52 @@ import cftime
 #import nc_time_axis
 import matplotlib.pyplot as plt
 
-from ecpost.utils import config
 from ecpost.utils import catalogue
-from ecpost.io.reader import reader_nemo
-from ecpost.io.postreader import postreader_nemo
-from ecpost.means.means import spacemean, timemean
+from ecpost.io.reader import reader_nemo_field
+from ecpost.io.postreader import averaging, get_profile
+from ecpost.means.means import timemean
 
 
 def _rescaled(vec):
     """ rescale by the initial value """
     return vec/vec[0]
 
+def _read_profile(expname, startyear, endyear, varname, reader="post", orca="ORCA2", replace=False):
+    """ Vertical profile (horizontal mean averaged over the window) from raw data ('nemo') or from the 'hovmoller' diagnostic ('post') """
+
+    # Read data from raw NEMO output
+    if reader == 'nemo':
+        data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
+        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca)
+        data = timemean(data=data, mode='global')
+
+    # Read data from post-processed data
+    elif reader == 'post':
+        data = get_profile(expname=expname, startyear=startyear, endyear=endyear, varname=varname,
+                           mode='global', orca=orca, replace=replace)
+
+    else:
+        raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
+
+    return data
+
 def plot_profile(expname, startyear, endyear, varname, 
             reader="post", orca="ORCA2", replace=False,
             color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
-    Graphics of averaged vertical profile 
+    Graphics of vertical profile (horizontal mean) averaged over the time window
     
     Positional Args:
     - expname: experiment name
     - startyear,endyear: time window
-    - varname: variable name
+    - varname: variable name (3D)
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
+    - orca: ORCA configuration [ORCA2, eORCA1]
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
-    - rescale: rescale by initial value
     - color, linestyle, marker, label: plot attributes
     - figname: save plot to file
 
@@ -50,17 +68,8 @@ def plot_profile(expname, startyear, endyear, varname,
 
     info = catalogue.observables('nemo')[varname]
 
-    # Read data from raw NEMO output
-    if reader == 'nemo':
-        data = reader_nemo(expname=expname, startyear=startyear, endyear=endyear)
-        vec = timemean(data=data, mode='global')
-        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
-
-    # Read data from post-processed data
-    elif reader == 'post':
-        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                               diagname='profile', mode='global', orca=orca, replace=replace)
-        vec=data[varname].values.flatten()
+    data = _read_profile(expname, startyear, endyear, varname, reader=reader, orca=orca, replace=replace)
+    vec = data[varname].values.flatten()
 
     # fixing depth y-axis
     zvec = data['z'].values.flatten()
@@ -83,8 +92,7 @@ def plot_profile(expname, startyear, endyear, varname,
 
     # Save figure
     if figname:
-        dirs = config.paths()
-        plt.savefig(os.path.join(dirs['osprey'], figname))
+        plt.savefig(figname)
 
     return pp
 
@@ -92,19 +100,19 @@ def plot_profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endy
             reader="post", orca="ORCA2", replace=False,
             color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
-    Graphics of averaged vertical profile 
+    Graphics of the difference of vertical profiles (exp2 - exp1) averaged over the time windows
     
     Positional Args:
-    - expname: experiment name
-    - startyear,endyear: time window
-    - varname: variable name
+    - expname1,2: experiment names
+    - startyear1,2, endyear1,2: time windows
+    - varname: variable name (3D)
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
+    - orca: ORCA configuration [ORCA2, eORCA1]
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
-    - rescale: rescale by initial value
     - color, linestyle, marker, label: plot attributes
     - figname: save plot to file
 
@@ -112,24 +120,10 @@ def plot_profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endy
 
     info = catalogue.observables('nemo')[varname]
 
-    # Read data from raw NEMO output
-    if reader == 'nemo':
-        data1 = reader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1)
-        vec = timemean(data=data1, mode='global')
-        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
-        #
-        data2 = reader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2)
-        vec = timemean(data=data2, mode='global')
-        vec = spacemean(data=vec, ndim='2D', orca='ORCA2')
-
-    # Read data from post-processed data
-    if reader == 'post':
-        data1 = postreader_nemo(expname=expname1, startyear=startyear1, endyear=endyear1, varname=varname, 
-                            diagname='profile', mode='global', orca=orca, replace=replace)
-        data2 = postreader_nemo(expname=expname2, startyear=startyear2, endyear=endyear2, varname=varname, 
-                            diagname='profile', mode='global', orca=orca, replace=replace)
-        diff = data2[varname] - data1[varname]
-        vec=diff.values.flatten()
+    data1 = _read_profile(expname1, startyear1, endyear1, varname, reader=reader, orca=orca, replace=replace)
+    data2 = _read_profile(expname2, startyear2, endyear2, varname, reader=reader, orca=orca, replace=replace)
+    diff = data2[varname] - data1[varname]
+    vec = diff.values.flatten()
 
     # fixing depth y-axis
     zvec = data1['z'].values.flatten()
@@ -148,11 +142,10 @@ def plot_profile_diff(expname1, startyear1, endyear1, expname2, startyear2, endy
     # plot profile
     pp = plt.plot(vec, -zvec, **plot_kwargs)
     plt.xlabel(f"{info['long_name']} Difference [{info['units']}]")
-    plt.ylabel(f'Depth [{info['units']}]')
+    plt.ylabel('Depth [m]')
 
     # Save figure
     if figname:
-        dirs = config.paths()
-        plt.savefig(os.path.join(dirs['figs'], figname))
+        plt.savefig(figname)
 
     return pp

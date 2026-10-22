@@ -16,10 +16,9 @@ import cftime
 import matplotlib.pyplot as plt
 
 from ecpost.utils import catalogue
-from ecpost.actions.reader import reader_nemo_field
-from ecpost.io.postreader import postreader_nemo, averaging
-from ecpost.utils.time import get_decimal_year
-from ecpost.means.means import apply_cost_function, movave
+from ecpost.io.reader import reader_nemo_field
+from ecpost.io.postreader import averaging, get_hovmoller
+from ecpost.means.means import apply_cost_function, timemean
 
 
 def _cutted(data):
@@ -30,11 +29,11 @@ def _cutted(data):
 
 def _rescaled(vec):
     """ rescale by the initial value """
-    return vec/vec.isel(time=0)
+    return vec/vec.isel({d: 0 for d in vec.dims if d in ('time', 'year')})
 
 # ISSUE: si potrebbe aggiungere un smoothing filter
 
-def plot_hovmoller(expname, startyear, endyear, varlabel, 
+def plot_hovmoller(expname, startyear, endyear, varname, 
                mode="plain", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
                rescale=False, avetype="standard", timeoff=0, ax=None, figname=None):
     """ 
@@ -43,15 +42,15 @@ def plot_hovmoller(expname, startyear, endyear, varlabel,
     Positional Args:
     - expname: experiment name
     - startyear,endyear: time window
-    - varlabel: variable name + ztag
+    - varname: variable name (3D)
 
     Optional Args:
-    - mode: time mode [plain, global, yearly, monthly, seasonally, seasons, winter, sprint, summer, autumn] 
+    - mode: time mean [plain, yearly] (see get_hovmoller)
     - reader: read the original raw data or averaged data ['nemo', 'post']
     - orca: ORCA configuration [ORCA2, eORCA1 ...]    
     - replace: replace existing files [False or True]
     - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
-    - refinfo: reference state inmodeion {expname, startyear, endyear, diagname, mode}
+    - refinfo: reference climatology {expname, startyear, endyear}, required if metric != 'base'
 
     Optional Args for figure settings:
     - rescale: rescale by initial value
@@ -61,11 +60,6 @@ def plot_hovmoller(expname, startyear, endyear, varlabel,
     - figname: save plot to file
     
     """
-    
-    if '-' in varlabel:
-        varname, ztag = varlabel.split('-', 1)
-    else:
-        varname, ztag = varlabel, None
 
     info = catalogue.observables('nemo')[varname]
 
@@ -73,37 +67,35 @@ def plot_hovmoller(expname, startyear, endyear, varlabel,
     if reader == "nemo":
 
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)        
-        data = averaging(data=data, varlabel=varlabel, diagname='hovmoller', mode=mode, orca=orca)
-        tvec = get_decimal_year(data['time'].values)
 
-        # apply cost function
+        # apply cost function w.r.t. the reference climatology, before any average (as in postreader)
         if metric != 'base':
-
             xdata = reader_nemo_field(expname=refinfo['expname'], startyear=refinfo['startyear'], endyear=refinfo['endyear'], varname=varname)
-            xdata = averaging(data=xdata, varlabel=varlabel, diagname=refinfo['diagname'], mode=refinfo['mode'], orca=orca)            
+            xdata = timemean(data=xdata, mode='global')
+            data = apply_cost_function(data, xdata, metric)
 
-            if refinfo['diagname'] == 'field':
-                data = apply_cost_function(data, xdata, metric, mode=mode, mode_ref=refinfo['mode'])    
-                data = averaging(data=data, varlabel=varlabel, diagname='timeseries', mode=mode, orca=orca)
-            else:
-                data = apply_cost_function(data, xdata, metric, mode=mode, mode_ref=refinfo['mode'])
-
+        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca)
+        data = timemean(data=data, mode=mode)
 
     # Read post-processed data
     elif reader == "post":
 
-        data = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varlabel, 
-                               diagname='hovmoller', mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
-        data = data[varname]
-        #tvec = get_decimal_year(data['time'].values)
+        data = get_hovmoller(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
+                             mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+
+    else:
+        raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
+
+    data = data[varname]
+    tdim = 'year' if 'year' in data.dims else 'time'
 
     # apply rescaling
     if rescale:
         data = _rescaled(data)
     
     # plot
-    pp = data.plot(x='time', y='z', cmap=plt.cm.coolwarm)
-    plt.xlabel('time')
+    pp = data.plot(x=tdim, y='z', cmap=plt.cm.coolwarm)
+    plt.xlabel(tdim)
     plt.ylabel('depth')
     plt.ylim(0,5000)
     plt.gca().invert_yaxis() # invert y-axis

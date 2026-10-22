@@ -19,4 +19,4 @@ conda activate ecearth-outpost
 See the [docs](docs/index.md) folder:
 
 - [Configuration](docs/configuration.md)
-- [Aggregated data](docs/aggregated-data.md): `climatology` pipeline for timeseries, profiles, hovmoller diagrams, maps and fields
+- [Aggregated data](docs/aggregated-data.md): `climatology` pipeline for timeseries, hovmoller diagrams, maps and fields

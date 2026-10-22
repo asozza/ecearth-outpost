@@ -19,12 +19,11 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
-from ecpost.utils import config
 from ecpost.utils import catalogue
-from ecpost.utils.time import get_decimal_year
 
-from ecpost.io.postreader import postreader_nemo
-from ecpost.means.means import movave, spacemean
+from ecpost.io.reader import reader_nemo_field
+from ecpost.io.postreader import averaging, get_timeseries
+from ecpost.means.means import movave
 
 def _cutted(vec):
     """ Cut vector """
@@ -34,8 +33,26 @@ def _rescaled(vec):
     """ rescale by the initial value """
     return vec/vec[0]
 
+def _read_timeseries(expname, startyear, endyear, varname, reader="post", orca="ORCA2", replace=False, metric="base"):
+    """ Monthly surface/volume mean from raw data ('nemo') or from the 'timeseries' diagnostic ('post') """
+
+    # Read data from raw NEMO output
+    if reader == "nemo":
+        data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
+        data = averaging(data=data, varname=varname, diagname='timeseries', orca=orca)
+
+    # Read post-processed data
+    elif reader == "post":
+        data = get_timeseries(expname=expname, startyear=startyear, endyear=endyear, varname=varname,
+                              orca=orca, replace=replace, metric=metric)
+
+    else:
+        raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
+
+    return data
+
 def plot_trajectory(expname, startyear, endyear, varname1, varname2, 
-                 reader="post", metric="base", replace=False, rescale=False, avetype="moving", 
+                 reader="post", orca="ORCA2", metric="base", replace=False, rescale=False, avetype="moving", 
                  color=None, linestyle='-', marker=None, label=None, figname=None):
     """ 
     Gregory Plot
@@ -47,7 +64,8 @@ def plot_trajectory(expname, startyear, endyear, varname1, varname2,
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
-    - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
+    - orca: ORCA configuration [ORCA2, eORCA1]
+    - metric: choose the type of cost function ['base', 'norm', 'diff' ...] (post only)
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
@@ -61,34 +79,18 @@ def plot_trajectory(expname, startyear, endyear, varname1, varname2,
     info1 = catalogue.observables('nemo')[varname1]
     info2 = catalogue.observables('nemo')[varname2]
 
-    # Read data from raw NEMO output
-    if reader == "nemo":
-        data = reader_nemo(expname, startyear, endyear)
-        tvec = get_decimal_year(data['time'].values)
+    data1 = _read_timeseries(expname, startyear, endyear, varname1, reader=reader, orca=orca, replace=replace, metric=metric)
+    data2 = _read_timeseries(expname, startyear, endyear, varname2, reader=reader, orca=orca, replace=replace, metric=metric)
+    tvec = data1['time'].values.flatten()
 
-        # apply moving average
-        if avetype == 'moving':
-            vec1 = movave(spacemean(data[varname1], info1['dim']),12)
-            vec2 = movave(spacemean(data[varname2], info2['dim']),12)
-            tvec, vec1, vec2 = _cutted(tvec), _cutted(vec1), _cutted(vec2)
-        else:
-            vec1 = data[varname1].values.flatten()
-            vec2 = data[varname1].values.flatten()            
-
-    # Read post-processed data
-    elif reader == "post":
-        data1 = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varname1, diagname='timeseries', replace=replace, metric=metric)
-        data2 = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varname2, diagname='timeseries', replace=replace, metric=metric)
-        tvec = data1['time'].values.flatten()
-
-        # apply moving average
-        if avetype == 'moving':
-            vec1 = movave(data1[varname1],12)
-            vec2 = movave(data2[varname2],12)
-            tvec, vec1, vec2 = _cutted(tvec), _cutted(vec1), _cutted(vec2)
-        else:
-            vec1 = data[varname1].values.flatten()
-            vec2 = data[varname1].values.flatten()
+    # apply moving average
+    if avetype == 'moving':
+        vec1 = movave(data1[varname1],12)
+        vec2 = movave(data2[varname2],12)
+        tvec, vec1, vec2 = _cutted(tvec), _cutted(vec1), _cutted(vec2)
+    else:
+        vec1 = data1[varname1].values.flatten()
+        vec2 = data2[varname2].values.flatten()
 
 
     # markers
@@ -123,14 +125,13 @@ def plot_trajectory(expname, startyear, endyear, varname1, varname2,
 
     # Save figure
     if figname:
-        dirs = config.paths()
-        plt.savefig(os.path.join(dirs['osprey'], figname))
+        plt.savefig(figname)
 
     return fig
 
 
 def gregory_plot_january(expname, startyear, endyear, varname1, varname2, 
-                         reader="post", metric="base", replace=False, rescale=False, avetype="moving", 
+                         reader="post", orca="ORCA2", metric="base", replace=False, rescale=False, avetype="moving", 
                          color=None, linestyle='-', marker=None, label=None, figname=None):
     """ 
     Gregory Plot
@@ -142,12 +143,13 @@ def gregory_plot_january(expname, startyear, endyear, varname1, varname2,
 
     Optional Args:
     - reader: read the original raw data or averaged data ['nemo', 'post']
-    - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
+    - orca: ORCA configuration [ORCA2, eORCA1]
+    - metric: choose the type of cost function ['base', 'norm', 'diff' ...] (post only)
     - replace: replace existing files [False or True]
     
     Optional Args for figure settings:
     - rescale: rescale by initial value
-    - avetype: choose the type of average ['moving' or 'standard']   
+    - avetype: choose the type of average ['moving', 'standard' or 'january']   
     - color, linestyle, marker, label: plot attributes
     - figname: save plot to file
          
@@ -156,38 +158,19 @@ def gregory_plot_january(expname, startyear, endyear, varname1, varname2,
     info1 = catalogue.observables('nemo')[varname1]
     info2 = catalogue.observables('nemo')[varname2]
 
-    # Read data from raw NEMO output
-    if reader == "nemo":
-        data = reader_nemo(expname, startyear, endyear)
-        tvec = get_decimal_year(data['time'].values)
+    data1 = _read_timeseries(expname, startyear, endyear, varname1, reader=reader, orca=orca, replace=replace, metric=metric)
+    data2 = _read_timeseries(expname, startyear, endyear, varname2, reader=reader, orca=orca, replace=replace, metric=metric)
 
-        # apply moving average
-        if avetype == 'moving':
-            vec1 = movave(spacemean(data[varname1], info1['dim']),12)
-            vec2 = movave(spacemean(data[varname2], info2['dim']),12)
-            tvec, vec1, vec2 = _cutted(tvec), _cutted(vec1), _cutted(vec2)
-        elif avetype == 'standard':
-            vec1 = spacemean(data[varname1], info1['dim'])
-            vec2 = spacemean(data[varname2], info2['dim'])            
-        elif avetype == 'january':        
-            data_winter = data.sel(time=data['time.month']==1)
-            vec1 = spacemean(data_winter[varname1], info1['dim'])
-            vec2 = spacemean(data_winter[varname2], info2['dim'])  
-
-    # Read post-processed data
-    elif reader == "post":
-        data1 = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varname1, diagname='timeseries', replace=replace, metric=metric)
-        data2 = postreader_nemo(expname=expname, startyear=startyear, endyear=endyear, varlabel=varname2, diagname='timeseries', replace=replace, metric=metric)
-        tvec = data1['time'].values.flatten()
-
-        # apply moving average
-        if avetype == 'moving':
-            vec1 = movave(data1[varname1],12)
-            vec2 = movave(data2[varname2],12)
-            tvec, vec1, vec2 = _cutted(tvec), _cutted(vec1), _cutted(vec2)
-        else:
-            vec1 = data[varname1].values.flatten()
-            vec2 = data[varname1].values.flatten()
+    # apply moving average
+    if avetype == 'moving':
+        vec1 = _cutted(movave(data1[varname1],12))
+        vec2 = _cutted(movave(data2[varname2],12))
+    elif avetype == 'standard':
+        vec1 = data1[varname1].values.flatten()
+        vec2 = data2[varname2].values.flatten()
+    elif avetype == 'january':
+        vec1 = data1[varname1].sel(time=data1['time.month']==1).values.flatten()
+        vec2 = data2[varname2].sel(time=data2['time.month']==1).values.flatten()
 
     # plot
     plot_kwargs = {}
@@ -210,8 +193,7 @@ def gregory_plot_january(expname, startyear, endyear, varname1, varname2,
 
     # Save figure
     if figname:
-        dirs = config.paths()
-        plt.savefig(os.path.join(dirs['osprey'], figname))
+        plt.savefig(figname)
 
     return fig
 

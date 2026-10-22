@@ -5,12 +5,12 @@
 Command line tool to produce light-weight aggregated data from the NEMO output of an
 EC-Earth4 experiment: timeseries, vertical profiles, hovmoller diagrams, horizontal maps
 and time-averaged fields. Files are written in the experiment 'post' folder as
-<expname>_<startyear>-<endyear>_<varname>_<diagname>_<mode>[_<metric>].nc
+<expname>_<startyear>-<endyear>_<varname>_<diagname>[_<metric>].nc
 
 Examples:
     climatology cs00 1990 1999 -v thetao tos
-    climatology cs00 1990 1999 -v thetao -d timeseries:yearly profile map:seasonally --config config.yml
-    climatology cs01 1990 1999 -v thetao -d profile --metric diff --ref cs00 1990 1999
+    climatology cs00 1990 1999 -v thetao -d timeseries hovmoller --config config.yml
+    climatology cs01 1990 1999 -v thetao -d hovmoller --metric diff --ref cs00 1990 1999
 
 Needed modules:
 # module load intel/2021.4.0 intel-mkl/19.0.5 prgenv/intel hdf5 netcdf4
@@ -28,14 +28,14 @@ from ecpost.utils import catalogue
 from ecpost.utils.config import Config
 from ecpost.io.postreader import DIAGNOSTICS, check_diagnostic, get_output_path, postreader_nemo_multi
 
-# diagnostics produced when none is requested
-DEFAULT_DIAGNOSTICS = ["timeseries", "profile", "hovmoller", "map", "field"]
-
 
 def parse_args(argv=None):
     """Command line parser for climatology"""
 
-    parser = argparse.ArgumentParser(description="Produce aggregated data (timeseries, profiles, hovmoller, maps, fields) from NEMO output")
+    parser = argparse.ArgumentParser(
+        description="Produce aggregated data (timeseries, hovmoller, maps, fields) from NEMO output",
+        epilog="diagnostics:\n" + "\n".join(f"  {d:<12}{v['description']}" for d, v in DIAGNOSTICS.items()),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
 
     # positional arguments (mandatory)
     parser.add_argument("expname", metavar="EXPNAME", help="Experiment name")
@@ -44,10 +44,8 @@ def parse_args(argv=None):
 
     # optional arguments
     parser.add_argument("-v", "--vars", nargs="+", required=True, metavar="VAR", help="NEMO variable names (see catalogue)")
-    parser.add_argument("-d", "--diags", nargs="+", default=DEFAULT_DIAGNOSTICS, metavar="DIAG[:MODE]",
-                        help=f"Diagnostics, optionally with time mode. Available: "
-                             + "; ".join(f"{d} [{', '.join(v['modes'])}]" for d, v in DIAGNOSTICS.items())
-                             + ". Default mode is the first one. Default: %(default)s")
+    parser.add_argument("-d", "--diags", nargs="+", default=list(DIAGNOSTICS), choices=list(DIAGNOSTICS), metavar="DIAG",
+                        help="Diagnostics to produce (default: all, see list below)")
     parser.add_argument("--orca", default="ORCA2", help="ORCA configuration [ORCA2, eORCA1]")
     parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml)")
     parser.add_argument("--metric", default="base", help="Metric with respect to the reference climatology [base, diff, ...]")
@@ -66,30 +64,11 @@ def parse_args(argv=None):
     return parsed
 
 
-def parse_diagnostics(diags):
-    """ Convert ['timeseries:yearly', 'map', ...] into [('timeseries', 'yearly'), ('map', 'global'), ...] """
-
-    out = []
-    for item in diags:
-        diagname, _, mode = item.partition(":")
-        if diagname not in DIAGNOSTICS:
-            raise ValueError(f"Unknown diagnostic '{diagname}'. Choose among {list(DIAGNOSTICS)}")
-        out.append((diagname, mode or DIAGNOSTICS[diagname]["modes"][0]))
-
-    return out
-
-
 def main(argv=None):
 
     # parser
     args = parse_args(argv)
     logging.getLogger().setLevel(logging.INFO)
-
-    try:
-        diagnostics = parse_diagnostics(args.diags)
-    except ValueError as e:
-        logging.error(e)
-        return 2
 
     refinfo = None
     if args.ref is not None:
@@ -110,12 +89,12 @@ def main(argv=None):
 
         # keep only the diagnostics compatible with the variable
         valid = []
-        for diagname, mode in diagnostics:
+        for diagname in args.diags:
             try:
-                check_diagnostic(varname, diagname, mode)
-                valid.append((diagname, mode))
+                check_diagnostic(varname, diagname)
+                valid.append(diagname)
             except ValueError as e:
-                logging.warning(f"Skipping {varname} {diagname}:{mode}: {e}")
+                logging.warning(f"Skipping {varname} {diagname}: {e}")
         if not valid:
             continue
 
@@ -129,12 +108,12 @@ def main(argv=None):
             failed.append((varname, str(e)))
             continue
 
-        for (diagname, mode), data in results.items():
+        for diagname, data in results.items():
             filename = get_output_path(dirs['post'], args.expname, args.startyear, args.endyear,
-                                       varname, diagname, mode, args.metric)
+                                       varname, diagname, args.metric)
             produced.append(filename)
             if not args.quiet:
-                print(f"\n=== {varname} | {diagname} | {mode} | {args.metric} ===")
+                print(f"\n=== {varname} | {diagname} | {args.metric} ===")
                 print(f"file: {filename}")
                 print(data.load())
             data.close()
