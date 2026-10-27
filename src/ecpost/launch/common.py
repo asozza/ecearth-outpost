@@ -14,6 +14,8 @@ Date: Oct 2026
 
 import os
 
+import numpy as np
+
 from ecpost.utils.config import Config
 
 
@@ -88,6 +90,32 @@ def get_figure_path(postdir, exps, varname, diagname, suffixes=(), metric="base"
     filename = f"{expnames}_{startyear}-{endyear}_{varname}_{diagname}{suffix}.{fmt}"
 
     return os.path.join(postdir, filename)
+
+
+def add_color_arguments(parser):
+    """Add the color scale arguments of the 2D plots (hovmoller, map)"""
+
+    parser.add_argument("--vmin", type=float, default=None, help="Lower limit of the color scale")
+    parser.add_argument("--vmax", type=float, default=None, help="Upper limit of the color scale")
+    parser.add_argument("--cmap", default=None, help="Matplotlib/cmocean colormap (default: RdYlBu_r, cmo.balance with --metric)")
+
+
+def shared_limits(arrays, vmin=None, vmax=None, symmetric=False):
+    """
+    Common color scale for several panels: 2nd-98th percentiles of all the values,
+    symmetric around zero if requested (e.g. differences). Explicit vmin/vmax win.
+    """
+
+    values = np.concatenate([np.ravel(np.ma.filled(np.ma.asarray(a, dtype=float), np.nan)) for a in arrays])
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return vmin, vmax
+
+    lo, hi = np.percentile(values, [2, 98])
+    if symmetric:
+        hi = max(abs(lo), abs(hi))
+        lo = -hi
+    return (lo if vmin is None else vmin), (hi if vmax is None else vmax)
 
 
 def print_summary(produced, failed):

@@ -30,6 +30,8 @@ dependencies = [
     "cftime",
     "netcdf4",
     "matplotlib",
+    "cartopy",
+    "cmocean",
     "dask",
     "cdo"
 ]
@@ -41,6 +43,8 @@ where = ["src"]
 climatology = "ecpost.launch.launch_climatology:main"
 timeseries = "ecpost.launch.launch_timeseries:main"
 profile = "ecpost.launch.launch_profile:main"
+hovmoller = "ecpost.launch.launch_hovmoller:main"
+map = "ecpost.launch.launch_map:main"
 
 [project.urls]
 "Homepage" = "https://github.com/asozza/ecearth-outpost"

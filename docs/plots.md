@@ -84,3 +84,63 @@ profile -e cs01 1990 1999 -v thetao --metric diff --ref cs00 1990 1999
 | `--zmax`     | maximum depth shown [m]; the x axis is rescaled on the visible part   |
 
 2D variables are skipped. Figure name: `EXP1[-EXP2...]_Y1-Y2_VAR_profile[_MODE][_METRIC].FMT`.
+
+## hovmoller
+
+Horizontal mean of 3D variables as function of time and depth, from the `hovmoller`
+diagnostic. One panel per experiment, stacked, with a common time axis and a common
+color scale.
+
+```bash
+hovmoller -e EXPNAME STARTYEAR ENDYEAR [-e ...] -v VAR [VAR ...] [options]
+```
+
+```bash
+# two experiments, upper 1000 m
+hovmoller -e cs00 1990 1999 -e cs01 1990 2009 -v thetao --zmax 1000
+
+# annual means, difference with respect to a reference climatology
+hovmoller -e cs01 1990 1999 -v thetao --mode yearly --metric diff --ref cs00 1990 1999
+```
+
+| Option         | Meaning                                                         |
+|----------------|-----------------------------------------------------------------|
+| `--mode`       | `plain` (monthly, default) or `yearly`                          |
+| `--zmax`       | maximum depth shown [m] (default 5000)                          |
+| `--rescale`    | divide each level by its initial value                          |
+| `--timeoff`    | offset added to the time axis                                   |
+| `--vmin/--vmax`| color scale limits (default: 2nd-98th percentiles of all panels, symmetric around 0 with `--metric`) |
+| `--cmap`       | colormap (default `RdYlBu_r`, `cmo.balance` with `--metric`)    |
+
+2D variables are skipped. Figure name: `EXP1[-EXP2...]_Y1-Y2_VAR_hovmoller[_MODE][_METRIC].FMT`.
+
+## map
+
+Horizontal maps averaged over the time window, one panel per experiment (two columns)
+with a common color scale. By default the `map` diagnostic is used: vertical mean for
+3D variables, the field itself for 2D ones. With `--depth` the model level nearest to
+the given depth is taken from the `field` diagnostic (heavier, 3D variables only).
+
+```bash
+map -e EXPNAME STARTYEAR ENDYEAR [-e ...] -v VAR [VAR ...] [options]
+```
+
+```bash
+# sea surface temperature of three experiments
+map -e cs00 1990 1999 -e cs01 1990 2009 -e cs02 1990 1999 -v tos
+
+# temperature at 100 m
+map -e cs00 1990 1999 -e cs01 1990 1999 -v thetao --depth 100
+
+# difference with respect to a reference climatology
+map -e cs01 1990 1999 -v tos --metric diff --ref cs00 1990 1999
+```
+
+| Option         | Meaning                                                         |
+|----------------|-----------------------------------------------------------------|
+| `--depth`      | depth [m] of the level to plot (default: vertical mean)         |
+| `--projection` | `robinson` (default), `platecarree`, `mollweide`                |
+| `--vmin/--vmax`| color scale limits (default: 2nd-98th percentiles of all panels, symmetric around 0 with `--metric`) |
+| `--cmap`       | colormap (default `RdYlBu_r`, `cmo.balance` with `--metric`)    |
+
+Figure name: `EXP1[-EXP2...]_Y1-Y2_VAR_map[_zDEPTH][_METRIC].FMT`.

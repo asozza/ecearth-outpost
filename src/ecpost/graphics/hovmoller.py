@@ -16,6 +16,7 @@ import cftime
 import matplotlib.pyplot as plt
 
 from ecpost.utils import catalogue
+from ecpost.utils.time import get_decimal_year
 from ecpost.io.reader import reader_nemo_field
 from ecpost.io.postreader import averaging, get_hovmoller
 from ecpost.means.means import apply_cost_function, timemean
@@ -34,8 +35,8 @@ def _rescaled(vec):
 # ISSUE: si potrebbe aggiungere un smoothing filter
 
 def plot_hovmoller(expname, startyear, endyear, varname, 
-               mode="plain", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, 
-               rescale=False, avetype="standard", timeoff=0, ax=None, figname=None):
+               mode="plain", reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, config_path=None,
+               rescale=False, avetype="standard", timeoff=0, zmax=5000, ax=None, figname=None, **kwargs):
     """ 
     Plot of Hovmöller diagram 
     
@@ -51,13 +52,16 @@ def plot_hovmoller(expname, startyear, endyear, varname,
     - replace: replace existing files [False or True]
     - metric: choose the type of cost function ['base', 'norm', 'diff' ...]
     - refinfo: reference climatology {expname, startyear, endyear}, required if metric != 'base'
+    - config_path: configuration file
 
     Optional Args for figure settings:
     - rescale: rescale by initial value
     - avetype: moving or standard average
     - timeoff: time offset
+    - zmax: maximum depth shown
     - ax: for drawing multiple subplots within the same figure
     - figname: save plot to file
+    - kwargs: passed to pcolormesh (cmap, vmin, vmax, ...)
     
     """
 
@@ -74,14 +78,15 @@ def plot_hovmoller(expname, startyear, endyear, varname,
             xdata = timemean(data=xdata, mode='global')
             data = apply_cost_function(data, xdata, metric)
 
-        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca)
+        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca, config_path=config_path)
         data = timemean(data=data, mode=mode)
 
     # Read post-processed data
     elif reader == "post":
 
         data = get_hovmoller(expname=expname, startyear=startyear, endyear=endyear, varname=varname, 
-                             mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+                             mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo,
+                             config_path=config_path)
 
     else:
         raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
@@ -92,13 +97,28 @@ def plot_hovmoller(expname, startyear, endyear, varname,
     # apply rescaling
     if rescale:
         data = _rescaled(data)
-    
-    # plot
-    pp = data.plot(x=tdim, y='z', cmap=plt.cm.coolwarm)
-    plt.xlabel(tdim)
-    plt.ylabel('depth')
-    plt.ylim(0,5000)
-    plt.gca().invert_yaxis() # invert y-axis
+
+    # time axis in decimal years
+    if tdim == 'time':
+        tvec = np.array(get_decimal_year(data['time'].values)) + timeoff
+    else:
+        tvec = data['year'].values + timeoff
+
+    # plot (with its own colorbar when no axes are given, as the former xarray plot)
+    colorbar = ax is None
+    if ax is None:
+        ax = plt.gca()
+    kwargs.setdefault('cmap', plt.cm.coolwarm)
+    pp = ax.pcolormesh(tvec, data['z'].values, data.transpose('z', tdim).values, shading='nearest', **kwargs)
+    if colorbar:
+        plt.colorbar(pp, ax=ax, label=f"{info['long_name']} [{info['units']}]")
+    ax.set_xlabel('time [years]')
+    ax.set_ylabel('depth [m]')
+    ax.set_ylim(zmax, 0) # depth increasing downwards
+
+    # Save figure
+    if figname:
+        plt.savefig(figname)
 
     return pp
 
