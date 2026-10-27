@@ -25,27 +25,33 @@ def _rescaled(vec):
     """ rescale by the initial value """
     return vec/vec[0]
 
-def _read_profile(expname, startyear, endyear, varname, reader="post", orca="ORCA2", replace=False):
-    """ Vertical profile (horizontal mean averaged over the window) from raw data ('nemo') or from the 'hovmoller' diagnostic ('post') """
+def _read_profile(expname, startyear, endyear, varname, mode="global", reader="post", orca="ORCA2", replace=False,
+                  metric="base", refinfo=None, config_path=None):
+    """ Vertical profile (horizontal mean averaged by mode) from raw data ('nemo') or from the 'hovmoller' diagnostic ('post') """
 
     # Read data from raw NEMO output
     if reader == 'nemo':
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
-        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca)
-        data = timemean(data=data, mode='global')
+        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca, config_path=config_path)
+        data = timemean(data=data, mode=mode)
 
     # Read data from post-processed data
     elif reader == 'post':
         data = get_profile(expname=expname, startyear=startyear, endyear=endyear, varname=varname,
-                           mode='global', orca=orca, replace=replace)
+                           mode=mode, orca=orca, replace=replace, metric=metric, refinfo=refinfo,
+                           config_path=config_path)
 
     else:
         raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
 
+    # groupby sorts seasons alphabetically: restore calendar order
+    if 'season' in data.dims:
+        data = data.reindex(season=['DJF', 'MAM', 'JJA', 'SON'])
+
     return data
 
-def plot_profile(expname, startyear, endyear, varname, 
-            reader="post", orca="ORCA2", replace=False,
+def plot_profile(expname, startyear, endyear, varname, mode="global", period=None,
+            reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, config_path=None,
             color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
     Graphics of vertical profile (horizontal mean) averaged over the time window
@@ -56,19 +62,34 @@ def plot_profile(expname, startyear, endyear, varname,
     - varname: variable name (3D)
 
     Optional Args:
+    - mode: time mean [global, monthly, seasonally] (see get_profile)
+    - period: month (1-12) or season (DJF, MAM, JJA, SON) to plot, required by mode monthly/seasonally
     - reader: read the original raw data or averaged data ['nemo', 'post']
     - orca: ORCA configuration [ORCA2, eORCA1]
     - replace: replace existing files [False or True]
+    - metric: choose the type of cost function ['base', 'norm', 'diff' ...] (post only)
+    - refinfo: reference climatology {expname, startyear, endyear}, required if metric != 'base'
+    - config_path: configuration file
     
     Optional Args for figure settings:
     - color, linestyle, marker, label: plot attributes
+    - ax: plot axes
     - figname: save plot to file
 
     """
 
     info = catalogue.observables('nemo')[varname]
 
-    data = _read_profile(expname, startyear, endyear, varname, reader=reader, orca=orca, replace=replace)
+    data = _read_profile(expname, startyear, endyear, varname, mode=mode, reader=reader, orca=orca, replace=replace,
+                         metric=metric, refinfo=refinfo, config_path=config_path)
+
+    # select a single month/season
+    for dim in ('month', 'season'):
+        if dim in data.dims:
+            if period is None:
+                raise ValueError(f"mode='{mode}' requires period")
+            data = data.sel({dim: period})
+
     vec = data[varname].values.flatten()
 
     # fixing depth y-axis
@@ -85,10 +106,15 @@ def plot_profile(expname, startyear, endyear, varname,
     if label:
         plot_kwargs['label'] = label
 
-    # plot profile
-    pp = plt.plot(vec, -zvec, **plot_kwargs)
-    plt.xlabel(info['long_name'])
-    plt.ylabel('depth')
+    # If an axis is provided, plot on it; otherwise, plot on the default plt object
+    if ax is not None:
+        pp = ax.plot(vec, -zvec, **plot_kwargs)
+        ax.set_xlabel(info['long_name'])
+        ax.set_ylabel('depth')
+    else:
+        pp = plt.plot(vec, -zvec, **plot_kwargs)
+        plt.xlabel(info['long_name'])
+        plt.ylabel('depth')
 
     # Save figure
     if figname:
