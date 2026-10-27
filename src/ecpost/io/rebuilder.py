@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Rebuilder
+
+Authors: Alessandro Sozza (CNR-ISAC) 
+Date: Oct 2023
+"""
+
+import os
+import glob
+import subprocess
+
+from ecpost.utils.config import Config
+
+def _get_nemo_timestep(filename):
+    """ Get timestep from a NEMO restart file """
+
+    return os.path.basename(filename).split('_')[1]
+
+##########################################################################################
+
+def rebuild_nemo_restart(expname, leg, config_path=None):
+    """Function to rebuild NEMO restart """
+
+    # configure folders
+    cfg = Config(config_path=config_path)
+    dirs = cfg.folders(expname)
+    
+    os.makedirs(os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo'), exist_ok=True)
+
+    rebuild_exe = os.path.join(dirs['rebuild'], "rebuild_nemo")
+  
+    for kind in ['restart', 'restart_ice']:
+        print(' Processing ' + kind)
+        flist = glob.glob(os.path.join(dirs['restart'], str(leg).zfill(3), expname + '*_' + kind + '_????.nc'))        
+        tstep = _get_nemo_timestep(flist[0])
+
+        for filename in flist:
+            destination_path = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', os.path.basename(filename))
+            try:
+                os.symlink(filename, destination_path)
+            except FileExistsError:
+                pass
+
+        rebuild_command = [rebuild_exe, "-m", os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', expname + "_" + tstep + "_" + kind ), str(len(flist))]
+        try:
+            print(rebuild_command)
+            subprocess.run(rebuild_command, stderr=subprocess.PIPE, text=True, check=True)
+            for file in glob.glob('nam_rebuld_*'):
+                os.remove(file)
+        except subprocess.CalledProcessError as e:
+            error_message = e.stderr
+            print(error_message)
+
+        for filename in flist:
+            destination_path = os.path.join(dirs['saveic'], str(leg).zfill(3), 'nemo', os.path.basename(filename))
+            os.remove(destination_path)
+
+    # delete temporary files
+    flist = glob.glob('nam_rebuild*')
+    for file in flist:
+        os.remove(file)
+
+    return None

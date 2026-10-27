@@ -2,10 +2,7 @@
 
 **Output post-processing tools for EC-Earth4**
 
-`ecearth-outpost` is a lightweight and modular toolkit for analyzing, averaging, and visualizing diagnostics from EC-Earth4 simulations. 
-It provides simple utilities to handle multi-dimensional fields, time series, spatial means, and other common climate-model products. 
-
-The goal is to streamline typical post-processing workflows — turning raw model output into clean, ready-to-use diagnostics for further analysis or publication.
+`ecearth-outpost` is a lightweight and modular toolkit for analyzing, averaging, and visualizing diagnostics from EC-Earth4 simulations. It provides simple utilities to handle multi-dimensional fields, time series, spatial means, and other common climate-model products. The goal is to streamline typical post-processing workflows — turning raw model output into clean, ready-to-use diagnostics for further analysis or publication.
 
 ## Installation
 
@@ -17,3 +14,10 @@ conda env create -f environment.yml
 conda activate ecearth-outpost
 ```
 
+## Documentation
+
+See the [docs](docs/index.md) folder:
+
+- [Configuration](docs/configuration.md)
+- [Aggregated data](docs/aggregated-data.md): `climatology` pipeline for timeseries, hovmoller diagrams, maps and fields
+- [Plots](docs/plots.md): `timeseries`, `profile` and other plotting tools
