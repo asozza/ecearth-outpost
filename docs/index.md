@@ -2,6 +2,7 @@
 
 - [Configuration](configuration.md): folder layout and `config.yml`
 - [Aggregated data](aggregated-data.md): the `climatology` pipeline and the `postreader` API
+- [Plots](plots.md): command line tools for figures (`timeseries`)
 
 ## Package layout
 

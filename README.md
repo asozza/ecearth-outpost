@@ -20,3 +20,4 @@ See the [docs](docs/index.md) folder:
 
 - [Configuration](docs/configuration.md)
 - [Aggregated data](docs/aggregated-data.md): `climatology` pipeline for timeseries, hovmoller diagrams, maps and fields
+- [Plots](docs/plots.md): `timeseries` and other plotting tools

@@ -30,22 +30,26 @@ def _rescaled(vec):
     return vec/vec[0]
 
 def _read_timeseries(expname, startyear, endyear, varname, mode="plain", reader="post", orca="ORCA2",
-                     replace=False, metric="base", refinfo=None):
+                     replace=False, metric="base", refinfo=None, config_path=None):
     """ Surface/volume mean from raw data ('nemo') or from the 'timeseries' diagnostic ('post'), time-averaged by mode """
 
     # Read data from raw NEMO output
     if reader == "nemo":
         data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
-        data = averaging(data=data, varname=varname, diagname='timeseries', orca=orca)
+        data = averaging(data=data, varname=varname, diagname='timeseries', orca=orca, config_path=config_path)
         data = timemean(data=data, mode=mode)
 
     # Read post-processed data
     elif reader == "post":
         data = get_timeseries(expname=expname, startyear=startyear, endyear=endyear, varname=varname, mode=mode,
-                              orca=orca, replace=replace, metric=metric, refinfo=refinfo)
+                              orca=orca, replace=replace, metric=metric, refinfo=refinfo, config_path=config_path)
 
     else:
         raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
+
+    # groupby sorts seasons alphabetically: restore calendar order
+    if 'season' in data.dims:
+        data = data.reindex(season=['DJF', 'MAM', 'JJA', 'SON'])
 
     return data
 
@@ -62,7 +66,7 @@ def _timeaxis(data, timeoff=0):
 
 
 def plot_timeseries(expname, startyear, endyear, varname, mode="plain", 
-               reader="post", orca="ORCA2", replace=False,
+               reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, config_path=None,
                rescale=False, avetype="standard", timeoff=-1990, 
                color=None, linestyle='-', marker=None, label=None, ax=None, figname=None):
     """ 
@@ -78,6 +82,9 @@ def plot_timeseries(expname, startyear, endyear, varname, mode="plain",
     - reader: read the original raw data or averaged data ['nemo', 'post']
     - orca: ORCA configuration [ORCA2, eORCA1]
     - replace: replace existing files [False or True]
+    - metric: choose the type of cost function ['base', 'norm', 'diff' ...] (post only)
+    - refinfo: reference climatology {expname, startyear, endyear}, required if metric != 'base'
+    - config_path: configuration file
 
     Optional Args for figure settings:
     - rescale: rescale by initial value
@@ -91,7 +98,8 @@ def plot_timeseries(expname, startyear, endyear, varname, mode="plain",
 
     info = catalogue.observables('nemo')[varname]
 
-    data = _read_timeseries(expname, startyear, endyear, varname, mode=mode, reader=reader, orca=orca, replace=replace)
+    data = _read_timeseries(expname, startyear, endyear, varname, mode=mode, reader=reader, orca=orca, replace=replace,
+                            metric=metric, refinfo=refinfo, config_path=config_path)
     tvec = _timeaxis(data, timeoff)
 
     # apply moving average

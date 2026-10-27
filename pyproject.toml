@@ -29,6 +29,7 @@ dependencies = [
     "scipy",
     "cftime",
     "netcdf4",
+    "matplotlib",
     "dask",
     "cdo"
 ]
@@ -38,6 +39,7 @@ where = ["src"]
 
 [project.scripts]
 climatology = "ecpost.launch.launch_climatology:main"
+timeseries = "ecpost.launch.launch_timeseries:main"
 
 [project.urls]
 "Homepage" = "https://github.com/asozza/ecearth-outpost"
