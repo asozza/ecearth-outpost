@@ -1,7 +1,8 @@
 # Configuration
 
 Paths are read from a `config.yml` file. By default it is looked up in the current
-directory; a different file can be given with `--config` (command line) or
+directory and then in the repository root (`ecearth-outpost/config.yml`, editable
+install); a different file can be given with `--config` (command line) or
 `config_path=` (Python API).
 
 ```yaml

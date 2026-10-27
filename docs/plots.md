@@ -16,7 +16,7 @@ Options shared by all tools:
 | `-e`         | `EXPNAME STARTYEAR ENDYEAR`, repeat for each experiment              |
 | `-v`         | variables, as named in [catalogue](../src/ecpost/utils/catalogue.py) |
 | `--labels`   | legend labels, one per experiment (default: experiment names)        |
-| `--config`   | configuration file (default `./config.yml`)                          |
+| `--config`   | configuration file (default: `config.yml` in the current directory, then in the repository root)                          |
 | `--orca`     | grid, `ORCA2` (default) or `eORCA1`                                  |
 | `--metric`   | `base` (default), `diff`, `norm`, … ; requires `--ref`               |
 | `--ref`      | `REFEXP REFSTART REFEND`, reference for `--metric`                   |

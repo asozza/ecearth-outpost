@@ -29,7 +29,7 @@ def add_common_arguments(parser):
     parser.add_argument("-v", "--vars", nargs="+", required=True, metavar="VAR", help="NEMO variable names (see catalogue)")
     parser.add_argument("--labels", nargs="+", metavar="LABEL", help="Legend labels, one per experiment (default: expname)")
     parser.add_argument("--orca", default="ORCA2", help="ORCA configuration [ORCA2, eORCA1]")
-    parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml)")
+    parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml, then <repo>/config.yml)")
     parser.add_argument("--metric", default="base", help="Metric with respect to the reference climatology [base, diff, ...]")
     parser.add_argument("--ref", nargs=3, metavar=("REFEXP", "REFSTART", "REFEND"), help="Reference experiment and time window (needed by --metric)")
     parser.add_argument("--replace", action="store_true", help="Recompute and replace existing aggregated files")

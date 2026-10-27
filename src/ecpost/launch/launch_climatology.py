@@ -47,7 +47,7 @@ def parse_args(argv=None):
     parser.add_argument("-d", "--diags", nargs="+", default=list(DIAGNOSTICS), choices=list(DIAGNOSTICS), metavar="DIAG",
                         help="Diagnostics to produce (default: all, see list below)")
     parser.add_argument("--orca", default="ORCA2", help="ORCA configuration [ORCA2, eORCA1]")
-    parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml)")
+    parser.add_argument("--config", dest="config_file", default=None, help="Configuration file (default: ./config.yml, then <repo>/config.yml)")
     parser.add_argument("--metric", default="base", help="Metric with respect to the reference climatology [base, diff, ...]")
     parser.add_argument("--ref", nargs=3, metavar=("REFEXP", "REFSTART", "REFEND"), help="Reference experiment and time window (needed by --metric)")
     parser.add_argument("--replace", action="store_true", help="Recompute and replace existing aggregated files")
