@@ -299,6 +299,30 @@ def zlayer(ztag, orca):
     
     return z1,z2
 
+
+def layermean(data, zmin=0, zmax=None, orca='ORCA2', config_path=None):
+    """
+    Volume mean over a depth layer of a horizontally averaged field (e.g. the 'hovmoller' diagnostic)
+
+    Levels are assigned to the layer by the depth of their T-point (zmin <= z < zmax) and
+    weighted by their wet volume, so that the full column gives back the volume mean.
+
+    Args:
+        data (DataArray): horizontal mean with a 'z' (depth) coordinate
+        zmin, zmax (float): layer bounds [m], zmax=None down to the bottom
+        orca (string): ORCA resolution <ORCA2,eORCA...>
+        config_path (string): path to config file (to locate the domain)
+
+    """
+
+    weights = elements(orca, config_path)['Vz'].assign_coords(z=data['z'].values)
+    zmax = np.inf if zmax is None else zmax
+    inside = (data['z'] >= zmin) & (data['z'] < zmax)
+    if not inside.any():
+        raise ValueError(f"No model level in the layer {zmin}-{zmax} m")
+
+    return data.where(inside, drop=True).weighted(weights.where(inside, drop=True)).mean(dim='z')
+
 #################################################################################
 # TOOLS FOR THE FORECAST
 #

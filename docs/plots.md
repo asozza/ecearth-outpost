@@ -58,6 +58,36 @@ timeseries -e cs01 1990 1999 -v thetao --metric diff --ref cs00 1990 1999
 
 Figure name: `EXP1[-EXP2...]_Y1-Y2_VAR_timeseries[_MODE][_movave][_METRIC].FMT`.
 
+## layers
+
+Timeseries of 3D variables averaged over depth layers, one panel per layer, with any
+number of experiments in the same panels. Data come from the `hovmoller` diagnostic:
+each model level is assigned to a layer by the depth of its T-point and weighted by its
+wet volume. The `total` panel is the volume mean of the full column (equal to the
+`timeseries` diagnostic up to partial-cell effects, ~1e-3 °C for `thetao` in ORCA2).
+
+```bash
+layers -e EXPNAME STARTYEAR ENDYEAR [-e ...] -v VAR [VAR ...] [options]
+```
+
+```bash
+# default layers: 0-100, 100-300, 300-700, 700-2000, 2000-bottom m and total (6 panels)
+layers -e cs00 1990 1999 -e cs01 1990 2009 -v thetao so
+
+# custom interfaces: 0-700, 700-2000, 2000-bottom m and total (4 panels), annual means
+layers -e cs00 1990 1999 -v thetao --layers 0 700 2000 --mode yearly
+```
+
+| Option       | Meaning                                                              |
+|--------------|----------------------------------------------------------------------|
+| `--layers`   | layer interfaces [m]; the last layer goes down to the bottom and the full column is always added (default `0 100 300 700 2000`) |
+| `--mode`     | `plain` (monthly, default), `yearly`, `monthly`/`seasonally` (seasonal cycle) |
+| `--moving`   | 12-month moving average (`--mode plain` only)                        |
+| `--rescale`  | divide each series by its initial value                              |
+| `--timeoff`  | offset added to the time axis                                        |
+
+2D variables are skipped. Figure name: `EXP1[-EXP2...]_Y1-Y2_VAR_layers[_MODE][_movave][_METRIC].FMT`.
+
 ## profile
 
 Vertical profiles (horizontal mean) of 3D variables, from the `hovmoller` diagnostic,

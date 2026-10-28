@@ -42,6 +42,7 @@ where = ["src"]
 [project.scripts]
 climatology = "ecpost.launch.launch_climatology:main"
 timeseries = "ecpost.launch.launch_timeseries:main"
+layers = "ecpost.launch.launch_layers:main"
 profile = "ecpost.launch.launch_profile:main"
 hovmoller = "ecpost.launch.launch_hovmoller:main"
 map = "ecpost.launch.launch_map:main"

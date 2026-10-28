@@ -56,6 +56,11 @@ def elements(orca='ORCA2', config_path=None):
     df['y'] = domain['e2t']
     df['z'] = domain['e3t_0']
 
+    # wet volume of each level (horizontal means of 3D fields are combined with these weights)
+    level = xr.DataArray(range(1, domain.sizes['z'] + 1), dims='z')
+    tmask = (level >= domain['top_level']) & (level <= domain['bottom_level']) & (domain['top_level'] > 0)
+    df['Vz'] = df['V'].where(tmask, 0).sum(dim=['y', 'x'])
+
     return df
 
 ##########################################################################################

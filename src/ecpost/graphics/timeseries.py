@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 from ecpost.utils import catalogue
 from ecpost.utils.time import get_decimal_year
 
-from ecpost.means.means import movave, timemean, year_shift
+from ecpost.means.means import layermean, movave, timemean, year_shift
 from ecpost.io.reader import reader_nemo_field
-from ecpost.io.postreader import averaging, get_timeseries
+from ecpost.io.postreader import averaging, check_diagnostic, get_hovmoller, get_timeseries
 
 
 def _cutted(vec):
@@ -133,6 +133,112 @@ def plot_timeseries(expname, startyear, endyear, varname, mode="plain",
         pp = plt.plot(tvec, vec, **plot_kwargs)
         plt.xlabel('time')
         plt.ylabel(info['long_name'])
+
+    # Save figure
+    if figname:
+        plt.savefig(figname)
+
+    return pp
+
+
+# default layers [m]: upper ocean split at 100/300/700, intermediate, deep, plus the full column
+LAYERS = [(0, 100), (100, 300), (300, 700), (700, 2000), (2000, None), (0, None)]
+
+def layer_name(layer):
+    """ Panel title of a layer """
+    zmin, zmax = layer
+    if zmin == 0 and zmax is None:
+        return "total"
+    return f"{zmin:g}-{zmax:g} m" if zmax is not None else f"{zmin:g} m-bottom"
+
+def plot_timeseries_by_layers(expname, startyear, endyear, varname, layers=LAYERS, mode="plain",
+               reader="post", orca="ORCA2", replace=False, metric="base", refinfo=None, config_path=None,
+               rescale=False, avetype="standard", timeoff=-1990,
+               color=None, linestyle='-', marker=None, label=None, axes=None, figname=None):
+    """
+    Graphics of timeseries averaged over depth layers, one panel per layer (3D variables only)
+
+    Positional Args:
+    - expname: experiment name
+    - startyear,endyear: time window
+    - varname: variable name (3D)
+
+    Optional Args for the reader:
+    - layers: list of (zmin, zmax) in meters, zmax=None down to the bottom (default LAYERS)
+    - mode: time mean [plain, yearly, monthly, seasonally] (see get_hovmoller)
+    - reader: read the original raw data or averaged data ['nemo', 'post']
+    - orca: ORCA configuration [ORCA2, eORCA1]
+    - replace: replace existing files [False or True]
+    - metric: choose the type of cost function ['base', 'norm', 'diff' ...] (post only)
+    - refinfo: reference climatology {expname, startyear, endyear}, required if metric != 'base'
+    - config_path: configuration file
+
+    Optional Args for figure settings:
+    - rescale: rescale by initial value
+    - avetype: choose the type of average ['moving' or 'standard'], moving only with mode='plain'
+    - timeoff: time offset (time and year axes only)
+    - color, linestyle, marker, label: plot attributes
+    - axes: plot axes, one per layer (default: new figure)
+    - figname: save plot to file
+
+    """
+
+    info = catalogue.observables('nemo')[varname]
+    check_diagnostic(varname, 'hovmoller')
+
+    # Read data from raw NEMO output
+    if reader == "nemo":
+        data = reader_nemo_field(expname=expname, startyear=startyear, endyear=endyear, varname=varname)
+        data = averaging(data=data, varname=varname, diagname='hovmoller', orca=orca, config_path=config_path)
+        data = timemean(data=data, mode=mode)
+
+    # Read post-processed data
+    elif reader == "post":
+        data = get_hovmoller(expname=expname, startyear=startyear, endyear=endyear, varname=varname, mode=mode,
+                             orca=orca, replace=replace, metric=metric, refinfo=refinfo, config_path=config_path)
+
+    else:
+        raise ValueError(f"Unknown reader '{reader}'. Choose between 'nemo' and 'post'")
+
+    if 'season' in data.dims:
+        data = data.reindex(season=['DJF', 'MAM', 'JJA', 'SON'])
+    tvec = _timeaxis(data, timeoff)
+
+    if axes is None:
+        ncols = 2 if len(layers) <= 4 else 3
+        nrows = -(-len(layers) // ncols)
+        _, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 3.5 * nrows), sharex=True, squeeze=False)
+    axes = np.ravel(axes)
+
+    # load plot features
+    plot_kwargs = {}
+    if color:
+        plot_kwargs['color'] = color
+    if linestyle:
+        plot_kwargs['linestyle'] = linestyle
+    if marker:
+        plot_kwargs['marker'] = marker
+    if label:
+        plot_kwargs['label'] = label
+
+    pp = []
+    for ax, (zmin, zmax) in zip(axes, layers):
+        vec = layermean(data[varname], zmin, zmax, orca=orca, config_path=config_path)
+
+        # apply moving average
+        if (avetype == 'moving' and mode == 'plain'):
+            tlay, vec = _cutted(tvec), _cutted(movave(vec, 12))
+        else:
+            tlay, vec = tvec, vec.values.flatten()
+
+        # apply rescaling
+        if rescale:
+            vec = _rescaled(vec)
+
+        pp.append(ax.plot(tlay, vec, **plot_kwargs))
+        ax.set_title(layer_name((zmin, zmax)))
+        ax.set_xlabel('time')
+        ax.set_ylabel(info['long_name'])
 
     # Save figure
     if figname:
